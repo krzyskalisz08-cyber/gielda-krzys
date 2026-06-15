@@ -90,36 +90,50 @@ def market_tick_worker():
         
         for sym, asset in market_assets.items():
             trend = day_trends.get(sym, 0.02)
-            noise = random.uniform(-0.012, 0.012) # delikatne wahania minutowe
+            noise = random.uniform(-0.012, 0.012)
             
-            # Wpływ decyzji zakupowych graczy
             impact = (game_state["player_impact"][sym] - 1.0) * 0.03
             
             total_change = (trend * 0.6) + (noise * 0.4) + impact
-            total_change = max(min(total_change, 0.07), -0.07) # maksymalnie 7% ruchu na minutę
+            total_change = max(min(total_change, 0.07), -0.07)
             
             new_price = round(asset["price"] * (1 + total_change), 2)
             if new_price < 0.10: new_price = 0.10
             
             asset["price"] = new_price
             asset["history"].append(new_price)
-            if len(asset["history"]) > 40: # Ostatnie 40 świeczek widoczne na wykresie
+            if len(asset["history"]) > 40:
                 asset["history"].pop(0)
                 
-        # Powolne wygaszanie wolumenu graczy
         for sym in game_state["player_impact"]:
             game_state["player_impact"][sym] = 1.0 + (game_state["player_impact"][sym] - 1.0) * 0.85
 
 # Uruchomienie automatycznego rynku minutowego w osobnym wątku
 threading.Thread(target=market_tick_worker, daemon=True).start()
 
-# ---- INTERFEJS WIZUALNY (Zwraca plik index.html bezpośrednio na adresie głównym) ----
+# ---- INTERFEJS WIZUALNY (BEZPIECZNA ŚCIEŻKA DLA RENDERA) ----
 @app.get("/", response_class=HTMLResponse)
 def get_gui():
+    # Pobiera bezwzględną ścieżkę do folderu, w którym znajduje się main.py
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    html_path = os.path.join(base_dir, "index.html")
+    
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    # Alternatywne wyszukiwanie awaryjne w folderze roboczym
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>Błąd: Nie znaleziono pliku index.html w tym samym folderze co main.py!</h1>"
+            
+    return """
+    <div style="background:#1f1212; color:#ff5350; padding:20px; font-family:sans-serif; text-align:center; border:2px solid red; margin:50px;">
+        <h2>⚠️ BŁĄD SYSTEMU GIEŁDY II RP ⚠️</h2>
+        <p>Serwer Render działa, ale nie może znaleźć pliku <b>index.html</b>!</p>
+        <p>Upewnij się, że plik <b>index.html</b> znajduje się w tym samym folderze (repozytorium GitHub) co plik <b>main.py</b>.</p>
+    </div>
+    """
 
 # ---- ENDPOINTY INTERFEJSU API ----
 @app.get("/api/game-data")
@@ -136,7 +150,6 @@ def login(data: CreatePlayer):
     if p and p["password"] == data.password:
         return {"status": "ok", "username": data.username, "balance": p["balance"], "portfolio": p["portfolio"]}
     elif not p:
-        # Automatyczne zakładanie konta patrolu na obozie
         game_state["players"][data.username] = {"password": data.password, "balance": 5000.0, "portfolio": []}
         return {"status": "registered", "username": data.username, "balance": 5000.0, "portfolio": []}
     raise HTTPException(status_code=401, detail="Błędne hasło patrolu!")
