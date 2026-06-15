@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giełda Krzys</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --green: #2ecc71;
+            --red: #e74c3c;
+            --border-color: #2a2a2a;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        h3 {
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 5px;
+            font-size: 18px;
+        }
+        .controls {
+            background: var(--card-color);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        select, input, button {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #252525;
+            color: white;
+            font-size: 16px;
+        }
+        select {
+            flex: 1;
+        }
+        button {
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .buy { background: var(--green); width: 48%; }
+        .sell { background: var(--red); width: 48%; }
+        
+        .grid-layout {
+            display: block;
+        }
+        
+        .card {
+            background: var(--card-color);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .chart-container {
+            background: #050505;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .chart-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .chart-title h4 {
+            margin: 0;
+            font-size: 16px;
+        }
+        .current-price {
+            font-weight: bold;
+            color: #f1c40f;
+        }
+        #chatBox {
+            height: 180px;
+            overflow-y: auto;
+            background: #050505;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+        .chat-msg {
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+        .chat-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .chat-input-group input {
+            width: 100%;
+        }
+        .chat-input-group button {
+            background: #3498db;
+            width: 100%;
+        }
+        .data-list {
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        /* Stylizacja dla komputerów / większych tabletów */
+        @media (min-width: 768px) {
+            body { padding: 20px; }
+            .grid-layout {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+            }
+            .chat-input-group {
+                flex-direction: row;
+            }
+            .chat-input-group button {
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📈 Giełda Krzys</h1>
+    
+    <div class="controls">
+        <label for="range">Zakres czasu:</label>
+        <select id="range">
+            <option value="5">5 minut</option>
+            <option value="15">15 minut</option>
+            <option value="60">1 godzina</option>
+            <option value="1440">1 dzień</option>
+        </select>
+    </div>
+
+    <div class="grid-layout">
+        <div class="card">
+            <h3>Wykresy Instrumentów</h3>
+            <div id="charts"></div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h3>Top 5 Najdroższych</h3>
+                <div id="top5" class="data-list"></div>
+            </div>
+
+            <div class="card">
+                <h3>Twoje Portfolio (Gracz 1)</h3>
+                <div id="portfolio" class="data-list"></div>
+            </div>
+
+            <div class="card">
+                <h3>Ranking Graczy</h3>
+                <div id="ranking" class="data-list"></div>
+            </div>
+
+            <div class="card">
+                <h3>Chat Live</h3>
+                <div id="chatBox"></div>
+                <div class="chat-input-group">
+                    <input id="chatName" placeholder="Twój nick" max-length="15">
+                    <input id="chatText" placeholder="Napisz wiadomość...">
+                    <button onclick="sendMessage()">Wyślij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// Dynamiczny adres API: wykrywa, czy uruchomiono lokalnie, czy na serwerze produkcyjnym
+const API_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
+    ? "http://127.0.0.1:8000" 
+    : window.location.origin;
+
+const chartsDiv = document.getElementById("charts");
+const top5Div = document.getElementById("top5");
+const range = document.getElementById("range");
+let charts = {};
+let history = {};
+
+async function fetchPrices() {
+    try {
+        const res = await fetch(`${API_URL}/prices`);
+        return await res.json();
+    } catch (e) {
+        console.error("Błąd pobierania cen:", e);
+        return [];
+    }
+}
+
+function filterHistory(symbol) {
+    const minutes = parseInt(range.value);
+    const now = new Date();
+    return (history[symbol] || []).filter(p => {
+        const diff = (now - new Date(p.x)) / 60000;
+        return diff <= minutes;
+    });
+}
+
+function createChart(symbol, parent) {
+    let container = parent.querySelector(`[data-symbol="${symbol}"]`);
+    if (container) return container.querySelector("canvas").getContext("2d");
+
+    container = document.createElement("div");
+    container.className = "chart-container";
+    container.setAttribute("data-symbol", symbol);
+
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "chart-title";
+    
+    const title = document.createElement("h4");
+    title.innerText = symbol;
+    titleDiv.appendChild(title);
+
+    const priceSpan = document.createElement("span");
+    priceSpan.className = "current-price";
+    priceSpan.id = `price-${symbol}`;
+    priceSpan.innerText = "0.00 $";
+    titleDiv.appendChild(priceSpan);
+    
+    container.appendChild(titleDiv);
+
+    const canvas = document.createElement("canvas");
+    container.appendChild(canvas);
+
+    const btnGroup = document.createElement("div");
+    btnGroup.style.display = "flex";
+    btnGroup.style.justifyContent = "space-between";
+    btnGroup.style.marginTop = "10px";
+
+    const buy = document.createElement("button");
+    buy.innerText = "Kup";
+    buy.className = "buy";
+    buy.onclick = () => trade(symbol, "buy");
+    btnGroup.appendChild(buy);
+
+    const sell = document.createElement("button");
+    sell.innerText = "Sprzedaj";
+    sell.className = "sell";
+    sell.onclick = () => trade(symbol, "sell");
+    btnGroup.appendChild(sell);
+
+    container.appendChild(btnGroup);
+    parent.appendChild(container);
+
+    return canvas.getContext("2d");
+}
+
+async function trade(symbol, type) {
+    let amount = prompt(`Ile jednostek ${symbol} chcesz ${type === 'buy' ? 'kupić' : 'sprzedać'}?`);
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) return;
+
+    try {
+        const res = await fetch(`${API_URL}/transactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                player_id: 1,
+                symbol: symbol,
+                type: type,
+                amount: parseFloat(amount)
+            })
+        });
+        const result = await res.json();
+        if(result.error) {
+            alert("Błąd: " + result.error);
+        }
+    } catch(e) {
+        alert("Błąd połączenia podczas transakcji.");
+    }
+    loadPortfolio();
+    loadRanking();
+}
+
+async function updateCharts() {
+    const prices = await fetchPrices();
+    if (!prices || prices.length === 0) return;
+    
+    const time = new Date().toISOString();
+
+    prices.forEach(p => {
+        if (!history[p.symbol]) history[p.symbol] = [];
+        history[p.symbol].push({
+            x: time,
+            o: p.price * (1 + (Math.random() * 0.004 - 0.002)),
+            h: p.price * (1 + (Math.random() * 0.005)),
+            l: p.price * (1 - (Math.random() * 0.005)),
+            c: p.price
+        });
+
+        const priceLabel = document.getElementById(`price-${p.symbol}`);
+        if (priceLabel) {
+            priceLabel.innerText = `${p.price.toFixed(2)} $`;
+        }
+    });
+
+    // Aktualizacja listy TOP 5 tekstowo
+    const top5 = [...prices].sort((a, b) => b.price - a.price).slice(0, 5);
+    top5Div.innerHTML = "";
+    top5.forEach((p, idx) => {
+        top5Div.innerHTML += `${idx + 1}. <b>${p.symbol}</b>: ${p.price.toFixed(2)} $<br>`;
+    });
+
+    // Inicjalizacja wykresów dla wszystkich instrumentów
+    prices.forEach(p => {
+        if (charts[p.symbol]) return;
+        const ctx = createChart(p.symbol, chartsDiv);
+        charts[p.symbol] = new Chart(ctx, {
+            type: 'candlestick',
+            data: { datasets: [{ label: p.symbol, data: filterHistory(p.symbol) }] },
+            options: { 
+                animation: false, 
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { display: false } }
+            }
+        });
+    });
+
+    // Odświeżenie danych na wykresach
+    Object.keys(charts).forEach(s => {
+        charts[s].data.datasets[0].data = filterHistory(s);
+        charts[s].update();
+    });
+}
+
+async function loadPortfolio() {
+    try {
+        const res = await fetch(`${API_URL}/portfolio/1`);
+        const data = await res.json();
+        const div = document.getElementById("portfolio");
+        div.innerHTML = Object.keys(data).length === 0 ? "Portfel jest pusty." : "";
+        Object.keys(data).forEach(s => {
+            if (data[s] > 0) {
+                div.innerHTML += `<b>${s}</b>: ${data[s]} szt.<br>`;
+            }
+        });
+    } catch(e) {}
+}
+
+async function loadRanking() {
+    try {
+        const res = await fetch(`${API_URL}/ranking`);
+        const data = await res.json();
+        const div = document.getElementById("ranking");
+        div.innerHTML = "";
+        data.forEach((p, i) => {
+            div.innerHTML += `${i + 1}. <b>${p.name}</b> - $${p.balance.toFixed(2)}<br>`;
+        });
+    } catch(e) {}
+}
+
+async function loadChat() {
+    try {
+        const res = await fetch(`${API_URL}/messages`);
+        const data = await res.json();
+        const box = document.getElementById("chatBox");
+        
+        // Sprawdzenie czy użytkownik przewinął do dołu
+        const shouldScroll = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+        
+        box.innerHTML = "";
+        data.forEach(m => {
+            box.innerHTML += `<div class="chat-msg"><b>${m.player}</b>: ${m.text}</div>`;
+        });
+        
+        if (shouldScroll) {
+            box.scrollTop = box.scrollHeight;
+        }
+    } catch(e) {}
+}
+
+async function sendMessage() {
+    const nameInput = document.getElementById("chatName");
+    const textInput = document.getElementById("chatText");
+    
+    const name = nameInput.value.trim() || "Anonim";
+    const text = textInput.value.trim();
+    if (!text) return;
+
+    try {
+        await fetch(`${API_URL}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ player: name, text: text })
+        });
+        textInput.value = "";
+        loadChat();
+    } catch(e) {}
+}
+
+range.addEventListener("change", () => {
+    Object.keys(charts).forEach(s => {
+        charts[s].data.datasets[0].data = filterHistory(s);
+        charts[s].update();
+    });
+});
+
+function start() {
+    updateCharts();
+    loadPortfolio();
+    loadRanking();
+    loadChat();
+    setInterval(updateCharts, 3000);
+    setInterval(loadRanking, 5000);
+    setInterval(loadChat, 2000);
+}
+start();
+</script>
+</body>
+</html>
