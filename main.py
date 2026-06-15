@@ -1,15 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
 import random
 import threading
 import time
+import os
 
 app = FastAPI(title="Giełda Krzys")
 
-# 🔥 CORS (frontend działa z telefonu / przeglądarki)
+# Obsługa CORS, aby aplikacja mogła odbierać zapytania z dowolnego urządzenia
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- MODELE ----------------
+# ---------------- MODELE DANYCH ----------------
 class Company(BaseModel):
     name: str
     symbol: str
@@ -34,7 +35,7 @@ class Message(BaseModel):
     player: str
     text: str
 
-# ---------------- DANE ----------------
+# ---------------- BAZA DANYCH W PAMIĘCI ----------------
 companies = []
 prices = []
 players = []
@@ -49,7 +50,7 @@ start_companies = [
     {"name": "Ford", "symbol": "F", "sector": "Automotive"},
 ]
 
-# ---------------- INIT ----------------
+# ---------------- INICJALIZACJA RYNKU ----------------
 def init_market():
     for c in start_companies:
         companies.append(c)
@@ -59,17 +60,26 @@ def init_market():
             "timestamp": datetime.utcnow()
         })
 
-    players.append({"id": 1, "name": "krzys", "balance": 10000})
+    # Domyślny profil gracza
+    if not any(p["id"] == 1 for p in players):
+        players.append({"id": 1, "name": "krzys", "balance": 10000.0})
     portfolio[1] = {}
 
 init_market()
 
-# ---------------- ROOT (TO BRAKOWAŁO) ----------------
-@app.get("/")
-def root():
-    return {"status": "Backend działa"}
+# ---- SERWOWANIE FRONTENDU (Strona główna widoczna na telefonie) ----
+@app.get("/", response_class=HTMLResponse)
+def get_frontend():
+    # Pobiera dokładną ścieżkę do folderu, w którym znajduje się main.py
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    html_path = os.path.join(current_dir, "index.html")
+    
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Błąd: Serwer działa, ale nie znaleziono pliku index.html w katalogu głównym</h1>"
 
-# ---------------- API ----------------
+# ---------------- ENDPOINTY API ----------------
 @app.get("/prices")
 def get_prices():
     return prices
@@ -80,43 +90,54 @@ def get_portfolio(player_id: int):
 
 @app.get("/ranking")
 def ranking():
-    return players
+    return sorted(players, key=lambda x: x["balance"], reverse=True)
 
 @app.post("/transactions")
 def add_transaction(tx: Transaction):
-    price = next((p for p in prices if p["symbol"] == tx.symbol), None)
-    player = players[0]
+    price_obj = next((p for p in prices if p["symbol"] == tx.symbol), None)
+    player = next((p for p in players if p["id"] == tx.player_id), None)
 
-    if not price:
-        return {"error": "brak ceny"}
+    if not player:
+        return {"error": "Nie znaleziono takiego gracza"}
+    if not price_obj:
+        return {"error": "Brak wyceny dla podanego instrumentu"}
+
+    current_price = price_obj["price"]
 
     if tx.type == "buy":
-        cost = price["price"] * tx.amount
+        cost = current_price * tx.amount
+        if player["balance"] < cost:
+            return {"error": "Niewystarczające środki na koncie"}
+        
         player["balance"] -= cost
-        portfolio[tx.player_id][tx.symbol] = portfolio[tx.player_id].get(tx.symbol, 0) + tx.amount
+        portfolio[tx.player_id][tx.symbol] = portfolio[tx.player_id].get(tx.symbol, 0.0) + tx.amount
 
-    if tx.type == "sell":
+    elif tx.type == "sell":
+        owned = portfolio[tx.player_id].get(tx.symbol, 0.0)
+        if owned < tx.amount:
+            return {"error": "Nie posiadasz tylu akcji na sprzedaż"}
+            
         portfolio[tx.player_id][tx.symbol] -= tx.amount
-        player["balance"] += price["price"] * tx.amount
+        player["balance"] += current_price * tx.amount
 
     return {"status": "ok"}
 
 @app.get("/messages")
 def get_messages():
-    return messages
+    return messages[-50:]
 
 @app.post("/messages")
 def add_message(msg: Message):
     messages.append(msg)
     return {"status": "ok"}
 
-# ---------------- LIVE MARKET ----------------
+# ---------------- SYMULACJA RYNKU LIVE (WĄTEK) ----------------
 def market_loop():
     while True:
-        time.sleep(5)
+        time.sleep(3)
         for p in prices:
-            move = random.uniform(-0.02, 0.02)
-            p["price"] = round(max(p["price"] * (1 + move), 0.1), 2)
+            move = random.uniform(-0.015, 0.015)
+            p["price"] = round(max(p["price"] * (1 + move), 1.0), 2)
             p["timestamp"] = datetime.utcnow()
 
 threading.Thread(target=market_loop, daemon=True).start()
