@@ -3,440 +3,329 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giełda Krzys</title>
+    <title>Giełda II RP - Obóz</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
         :root {
-            --bg-color: #121212;
-            --card-color: #1e1e1e;
-            --text-color: #e0e0e0;
+            --bg: #111410;
+            --card: #1b201a;
+            --text: #e2e8e0;
+            --khaki: #8b966c;
             --green: #2ecc71;
             --red: #e74c3c;
-            --border-color: #2a2a2a;
         }
-        * {
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 10px;
-        }
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            margin: 10px 0;
-        }
-        h3 {
-            margin-top: 0;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 5px;
-            font-size: 18px;
-        }
-        .controls {
-            background: var(--card-color);
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        select, input, button {
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #333;
-            background: #252525;
-            color: white;
-            font-size: 16px;
-        }
-        select {
-            flex: 1;
-        }
-        button {
-            cursor: pointer;
-            border: none;
-            font-weight: bold;
-            transition: opacity 0.2s;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        .buy { background: var(--green); width: 48%; }
-        .sell { background: var(--red); width: 48%; }
+        * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace; }
+        body { background: var(--bg); color: var(--text); margin: 0; padding: 10px; }
+        h1, h2, h3 { text-align: center; color: var(--khaki); margin: 10px 0; }
+        .card { background: var(--card); padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #2d362b; }
+        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border-radius: 6px; border: 1px solid #3d493a; background: #0c0e0b; color: #fff; font-size: 16px; font-weight: bold; }
+        button { background: var(--khaki); color: #000; cursor: pointer; border: none; }
+        .btn-buy { background: var(--green); color: white; width: 48%; }
+        .btn-sell { background: var(--red); color: white; width: 48%; }
+        .flex-row { display: flex; justify-content: space-between; gap: 4px; }
         
-        .grid-layout {
-            display: block;
-        }
+        #loginPage, #gamePage { display: none; }
+        .asset-box { border-bottom: 1px solid #2d362b; padding: 10px 0; cursor: pointer; }
+        .asset-box:hover { background: #222920; }
+        .symbol { font-size: 20px; font-weight: bold; color: var(--khaki); }
+        .price { font-size: 18px; float: right; color: #f1c40f; }
+        .desc { font-size: 13px; color: #aaa; margin-top: 4px; display: none; background: #000; padding: 6px; border-radius: 4px; }
         
-        .card {
-            background: var(--card-color);
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .chart-container {
-            background: #050505;
-            padding: 10px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-        .chart-title {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .chart-title h4 {
-            margin: 0;
-            font-size: 16px;
-        }
-        .current-price {
-            font-weight: bold;
-            color: #f1c40f;
-        }
-        #chatBox {
-            height: 180px;
-            overflow-y: auto;
-            background: #050505;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid var(--border-color);
-            font-size: 14px;
-        }
-        .chat-msg {
-            margin-bottom: 6px;
-            word-break: break-all;
-        }
-        .chat-input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .chat-input-group input {
-            width: 100%;
-        }
-        .chat-input-group button {
-            background: #3498db;
-            width: 100%;
-        }
-        .data-list {
-            font-size: 15px;
-            line-height: 1.6;
-        }
-
-        /* Stylizacja dla komputerów / większych tabletów */
-        @media (min-width: 768px) {
-            body { padding: 20px; }
-            .grid-layout {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
-            }
-            .chat-input-group {
-                flex-direction: row;
-            }
-            .chat-input-group button {
-                width: auto;
-            }
-        }
+        #chatBox { height: 140px; overflow-y: auto; background: #0a0c09; padding: 8px; font-size: 14px; border-radius: 6px; margin-bottom: 6px; }
+        .badge { background: #34495e; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+        #adminPanel { display: none; border: 2px solid var(--red); }
     </style>
 </head>
 <body>
 
-    <h1>📈 Giełda Krzys</h1>
-    
-    <div class="controls">
-        <label for="range">Zakres czasu:</label>
-        <select id="range">
-            <option value="5">5 minut</option>
-            <option value="15">15 minut</option>
-            <option value="60">1 godzina</option>
-            <option value="1440">1 dzień</option>
-        </select>
+    <div id="loginPage" style="display: block; max-width: 400px; margin: 40px auto;">
+        <h1>🏕️ GIEŁDA II RP</h1>
+        <h3>Panel Harcerza & Druha</h3>
+        <div class="card">
+            <input id="loginUser" placeholder="Nazwa patrolu / Nick">
+            <input id="loginPass" type="password" placeholder="Hasło">
+            <button onclick="login()">WEJDŹ DO GRY</button>
+            <button onclick="register()" style="background:#444; color:white; margin-top:10px;">ZAREJESTRUJ NOWY PATROL</button>
+        </div>
+        <p style="font-size:11px; text-align:center; color:#777;">Wersja Admina: login: admin, haslo: druh</p>
     </div>
 
-    <div class="grid-layout">
-        <div class="card">
-            <h3>Wykresy Instrumentów</h3>
-            <div id="charts"></div>
+    <div id="gamePage">
+        <div class="card" style="text-align: center; background: var(--khaki); color: black;">
+            <span id="displayUser" style="font-weight:bold; font-size:18px;">Patrol</span> | 
+            <span>Stan Konta: <b id="displayBalance">5000.00</b> zł</span><br>
+            <span style="font-size:14px; margin-top:4px; display:inline-block;">📅 <b>DZIEŃ OBOZU: <span id="displayDay">1</span> / 15</b></span>
         </div>
 
-        <div>
-            <div class="card">
-                <h3>Top 5 Najdroższych</h3>
-                <div id="top5" class="data-list"></div>
+        <div id="adminPanel" class="card">
+            <h2 style="color:var(--red); margin-top:0;">⚒️ ROZKAZY DOPISANE (ADMIN)</h2>
+            <label>Dotacja dla patrolu:</label>
+            <div class="flex-row">
+                <input id="admTarget" placeholder="Nick patrolu" style="width:50%;">
+                <input id="admCash" type="number" placeholder="Kwota" style="width:30%;">
+                <button onclick="adminGiveCash()" style="background:var(--green); width:20%;">DODAJ</button>
             </div>
-
-            <div class="card">
-                <h3>Twoje Portfolio (Gracz 1)</h3>
-                <div id="portfolio" class="data-list"></div>
+            
+            <label style="margin-top:10px; display:block;">Interwencja na rynku (Trend):</label>
+            <select id="admAsset"></select>
+            <div class="flex-row">
+                <button onclick="adminTrend(-0.05)" style="background:var(--red); color:white;">ZBIJ KURS (Kryzys)</button>
+                <button onclick="adminTrend(0.05)" style="background:var(--green); color:white;">POMPUJ KURS (Hossa)</button>
             </div>
+            <button onclick="adminNextDay()" style="background:#e67e22; color:white; margin-top:8px;">🔔 NASTĘPNY DZIEŃ OBOZU (KOLEJNY ROK)</button>
+        </div>
 
-            <div class="card">
-                <h3>Ranking Graczy</h3>
-                <div id="ranking" class="data-list"></div>
+        <div class="card">
+            <h3>📈 NOTOWANIA GIEŁDOWE</h3>
+            <p style="font-size:11px; text-align:center; margin:0 0 10px 0; color:#888;">Kliknij spółkę, aby przeczytać MEMORANDUM historyczne</p>
+            <div id="marketList"></div>
+        </div>
+
+        <div class="card">
+            <h3>🛒 ZLEĆ TRANSAKCJĘ</h3>
+            <label>Wybierz aktywo:</label>
+            <select id="tradeAsset"></select>
+            
+            <label>Ilość jednostek:</label>
+            <input id="tradeAmount" type="number" value="1" min="0.1" step="0.1">
+
+            <label>Dźwignia Finansowa (Leverage):</label>
+            <select id="tradeLeverage">
+                <option value="1">Dźwignia 1x (Brak ryzyka debetu)</option>
+                <option value="2">Dźwignia 2x (Wymaga 50% depozytu)</option>
+                <option value="3">Dźwignia 3x (Wymaga 33% depozytu)</option>
+                <option value="4">Dźwignia 4x (Wymaga 25% depozytu)</option>
+                <option value="5">Dźwignia 5x (Maksymalne Ryzyko! 20% depozytu)</option>
+            </select>
+
+            <div class="flex-row" style="margin-top:10px;">
+                <button class="btn-buy" onclick="executeTrade('buy')">KUP (Długa)</button>
+                <button class="btn-sell" onclick="executeTrade('sell')">SPRZEDAJ (Krótka)</button>
             </div>
+        </div>
 
-            <div class="card">
-                <h3>Chat Live</h3>
-                <div id="chatBox"></div>
-                <div class="chat-input-group">
-                    <input id="chatName" placeholder="Twój nick" max-length="15">
-                    <input id="chatText" placeholder="Napisz wiadomość...">
-                    <button onclick="sendMessage()">Wyślij</button>
-                </div>
+        <div class="card">
+            <h3>🎒 TWÓJ EKWIPUNEK (PORTFEL)</h3>
+            <div id="portfolioList" style="font-size:14px; line-height:1.5;"></div>
+        </div>
+
+        <div class="card">
+            <h3>🏆 TABLICA WYNIKÓW OBOZU</h3>
+            <div id="rankingList" style="font-size:14px; line-height:1.5;"></div>
+        </div>
+
+        <div class="card">
+            <h3>💬 POLOWA RADIOSTACJA (CZAT)</h3>
+            <div id="chatBox"></div>
+            <div class="flex-row">
+                <input id="chatText" placeholder="Napisz meldunek do innych patroli..." style="flex:1;">
+                <button onclick="sendChatMessage()" style="width:80px; margin-left:5px;">Wyślij</button>
             </div>
         </div>
     </div>
 
 <script>
-// Dynamiczny adres API: wykrywa, czy uruchomiono lokalnie, czy na serwerze produkcyjnym
-const API_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" 
-    ? "http://127.0.0.1:8000" 
-    : window.location.origin;
+const API_URL = window.location.origin;
+let currentUser = "";
+let currentPass = "";
 
-const chartsDiv = document.getElementById("charts");
-const top5Div = document.getElementById("top5");
-const range = document.getElementById("range");
-let charts = {};
-let history = {};
+function toggleDesc(id) {
+    const el = document.getElementById('desc-' + id);
+    el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
 
-async function fetchPrices() {
-    try {
-        const res = await fetch(`${API_URL}/prices`);
-        return await res.json();
-    } catch (e) {
-        console.error("Błąd pobierania cen:", e);
-        return [];
+async function register() {
+    const u = document.getElementById("loginUser").value.trim();
+    const p = document.getElementById("loginPass").value.trim();
+    if(!u || !p) return alert("Wpisz nick i hasło!");
+    
+    const res = await fetch(`${API_URL}/api/register`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username: u, password: p })
+    });
+    const data = await res.json();
+    alert(data.status || data.error);
+}
+
+async function login() {
+    const u = document.getElementById("loginUser").value.trim();
+    const p = document.getElementById("loginPass").value.trim();
+    
+    const res = await fetch(`${API_URL}/api/player/${u}/${p}`);
+    const data = await res.json();
+    
+    if(data.error) {
+        alert(data.error);
+    } else {
+        currentUser = u;
+        currentPass = p;
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("gamePage").style.display = "block";
+        document.getElementById("displayUser").innerText = "Patrol: " + u.toUpperCase();
+        
+        if(u === "admin") {
+            document.getElementById("adminPanel").style.display = "block";
+        }
+        
+        startCycles();
     }
 }
 
-function filterHistory(symbol) {
-    const minutes = parseInt(range.value);
-    const now = new Date();
-    return (history[symbol] || []).filter(p => {
-        const diff = (now - new Date(p.x)) / 60000;
-        return diff <= minutes;
-    });
-}
-
-function createChart(symbol, parent) {
-    let container = parent.querySelector(`[data-symbol="${symbol}"]`);
-    if (container) return container.querySelector("canvas").getContext("2d");
-
-    container = document.createElement("div");
-    container.className = "chart-container";
-    container.setAttribute("data-symbol", symbol);
-
-    const titleDiv = document.createElement("div");
-    titleDiv.className = "chart-title";
+async function updateGameData() {
+    if(!currentUser) return;
     
-    const title = document.createElement("h4");
-    title.innerText = symbol;
-    titleDiv.appendChild(title);
-
-    const priceSpan = document.createElement("span");
-    priceSpan.className = "current-price";
-    priceSpan.id = `price-${symbol}`;
-    priceSpan.innerText = "0.00 $";
-    titleDiv.appendChild(priceSpan);
+    // 1. Pobieranie cen i generowanie listy rynku
+    const resPrices = await fetch(`${API_URL}/api/prices`);
+    const assets = await resPrices.json();
     
-    container.appendChild(titleDiv);
-
-    const canvas = document.createElement("canvas");
-    container.appendChild(canvas);
-
-    const btnGroup = document.createElement("div");
-    btnGroup.style.display = "flex";
-    btnGroup.style.justifyContent = "space-between";
-    btnGroup.style.marginTop = "10px";
-
-    const buy = document.createElement("button");
-    buy.innerText = "Kup";
-    buy.className = "buy";
-    buy.onclick = () => trade(symbol, "buy");
-    btnGroup.appendChild(buy);
-
-    const sell = document.createElement("button");
-    sell.innerText = "Sprzedaj";
-    sell.className = "sell";
-    sell.onclick = () => trade(symbol, "sell");
-    btnGroup.appendChild(sell);
-
-    container.appendChild(btnGroup);
-    parent.appendChild(container);
-
-    return canvas.getContext("2d");
-}
-
-async function trade(symbol, type) {
-    let amount = prompt(`Ile jednostek ${symbol} chcesz ${type === 'buy' ? 'kupić' : 'sprzedać'}?`);
-    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) return;
-
-    try {
-        const res = await fetch(`${API_URL}/transactions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                player_id: 1,
-                symbol: symbol,
-                type: type,
-                amount: parseFloat(amount)
-            })
-        });
-        const result = await res.json();
-        if(result.error) {
-            alert("Błąd: " + result.error);
-        }
-    } catch(e) {
-        alert("Błąd połączenia podczas transakcji.");
-    }
-    loadPortfolio();
-    loadRanking();
-}
-
-async function updateCharts() {
-    const prices = await fetchPrices();
-    if (!prices || prices.length === 0) return;
+    const marketDiv = document.getElementById("marketList");
+    const tradeSelect = document.getElementById("tradeAsset");
+    const admSelect = document.getElementById("admAsset");
     
-    const time = new Date().toISOString();
-
-    prices.forEach(p => {
-        if (!history[p.symbol]) history[p.symbol] = [];
-        history[p.symbol].push({
-            x: time,
-            o: p.price * (1 + (Math.random() * 0.004 - 0.002)),
-            h: p.price * (1 + (Math.random() * 0.005)),
-            l: p.price * (1 - (Math.random() * 0.005)),
-            c: p.price
-        });
-
-        const priceLabel = document.getElementById(`price-${p.symbol}`);
-        if (priceLabel) {
-            priceLabel.innerText = `${p.price.toFixed(2)} $`;
-        }
+    const currentTradeSel = tradeSelect.value;
+    const currentAdmSel = admSelect.value;
+    
+    marketDiv.innerHTML = "";
+    tradeSelect.innerHTML = "";
+    admSelect.innerHTML = "";
+    
+    assets.forEach(a => {
+        marketDiv.innerHTML += `
+            <div class="asset-box" onclick="toggleDesc('${a.symbol}')">
+                <span class="symbol">${a.symbol}</span> 
+                <span style="font-size:12px; color:#888;">(${a.name})</span>
+                <span class="price">${a.price.toFixed(2)} zł</span>
+                <div class="desc" id="desc-${a.symbol}"><b>Memorandum:</b> ${a.desc}</div>
+            </div>`;
+            
+        tradeSelect.innerHTML += `<option value="${a.symbol}">${a.symbol} (${a.name})</option>`;
+        admSelect.innerHTML += `<option value="${a.symbol}">${a.symbol}</option>`;
     });
+    
+    if(currentTradeSel) tradeSelect.value = currentTradeSel;
+    if(currentAdmSel) admSelect.value = currentAdmSel;
 
-    // Aktualizacja listy TOP 5 tekstowo
-    const top5 = [...prices].sort((a, b) => b.price - a.price).slice(0, 5);
-    top5Div.innerHTML = "";
-    top5.forEach((p, idx) => {
-        top5Div.innerHTML += `${idx + 1}. <b>${p.symbol}</b>: ${p.price.toFixed(2)} $<br>`;
-    });
-
-    // Inicjalizacja wykresów dla wszystkich instrumentów
-    prices.forEach(p => {
-        if (charts[p.symbol]) return;
-        const ctx = createChart(p.symbol, chartsDiv);
-        charts[p.symbol] = new Chart(ctx, {
-            type: 'candlestick',
-            data: { datasets: [{ label: p.symbol, data: filterHistory(p.symbol) }] },
-            options: { 
-                animation: false, 
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { x: { display: false } }
+    // 2. Pobieranie danych gracza (kasa, portfolio)
+    const resPlayer = await fetch(`${API_URL}/api/player/${currentUser}/${currentPass}`);
+    const pData = await resPlayer.json();
+    
+    document.getElementById("displayBalance").innerText = pData.balance.toFixed(2);
+    document.getElementById("displayDay").innerText = pData.current_day;
+    
+    const portDiv = document.getElementById("portfolioList");
+    portDiv.innerHTML = "";
+    let hasAsset = false;
+    
+    Object.keys(pData.portfolio).forEach(sym => {
+        pData.portfolio[sym].forEach(pos => {
+            if(pos.amount > 0) {
+                hasAsset = true;
+                portDiv.innerHTML += `💼 <b>${sym}</b>: Ilość: ${pos.amount.toFixed(1)} | Zakup: ${pos.buy_price.toFixed(2)} zł | Dźwignia: <b>${pos.leverage}x</b><br>`;
             }
         });
     });
+    if(!hasAsset) portDiv.innerHTML = "Twój portfel jest pusty. Złóż pierwsze zamówienie.";
 
-    // Odświeżenie danych na wykresach
-    Object.keys(charts).forEach(s => {
-        charts[s].data.datasets[0].data = filterHistory(s);
-        charts[s].update();
+    // 3. Ranking graczy
+    const resRank = await fetch(`${API_URL}/api/ranking`);
+    const rData = await resRank.json();
+    const rankDiv = document.getElementById("rankingList");
+    rankDiv.innerHTML = "";
+    rData.forEach((player, idx) => {
+        rankDiv.innerHTML += `${idx+1}. <b>${player.name}</b>: ${player.balance.toFixed(2)} zł<br>`;
     });
 }
 
-async function loadPortfolio() {
-    try {
-        const res = await fetch(`${API_URL}/portfolio/1`);
-        const data = await res.json();
-        const div = document.getElementById("portfolio");
-        div.innerHTML = Object.keys(data).length === 0 ? "Portfel jest pusty." : "";
-        Object.keys(data).forEach(s => {
-            if (data[s] > 0) {
-                div.innerHTML += `<b>${s}</b>: ${data[s]} szt.<br>`;
-            }
-        });
-    } catch(e) {}
+async function executeTrade(type) {
+    const sym = document.getElementById("tradeAsset").value;
+    const amt = parseFloat(document.getElementById("tradeAmount").value);
+    const lev = parseInt(document.getElementById("tradeLeverage").value);
+    
+    if(!amt || amt <= 0) return alert("Wpisz poprawną ilość!");
+    
+    const res = await fetch(`${API_URL}/api/transactions`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: currentUser,
+            symbol: sym,
+            type: type,
+            amount: amt,
+            leverage: lev
+        })
+    });
+    const data = await res.json();
+    if(data.error) alert(data.error);
+    updateGameData();
 }
 
-async function loadRanking() {
-    try {
-        const res = await fetch(`${API_URL}/ranking`);
-        const data = await res.json();
-        const div = document.getElementById("ranking");
-        div.innerHTML = "";
-        data.forEach((p, i) => {
-            div.innerHTML += `${i + 1}. <b>${p.name}</b> - $${p.balance.toFixed(2)}<br>`;
-        });
-    } catch(e) {}
-}
-
+// ---- FUNKCJE CZATU ----
 async function loadChat() {
-    try {
-        const res = await fetch(`${API_URL}/messages`);
-        const data = await res.json();
-        const box = document.getElementById("chatBox");
-        
-        // Sprawdzenie czy użytkownik przewinął do dołu
-        const shouldScroll = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
-        
-        box.innerHTML = "";
-        data.forEach(m => {
-            box.innerHTML += `<div class="chat-msg"><b>${m.player}</b>: ${m.text}</div>`;
-        });
-        
-        if (shouldScroll) {
-            box.scrollTop = box.scrollHeight;
-        }
-    } catch(e) {}
-}
-
-async function sendMessage() {
-    const nameInput = document.getElementById("chatName");
-    const textInput = document.getElementById("chatText");
-    
-    const name = nameInput.value.trim() || "Anonim";
-    const text = textInput.value.trim();
-    if (!text) return;
-
-    try {
-        await fetch(`${API_URL}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ player: name, text: text })
-        });
-        textInput.value = "";
-        loadChat();
-    } catch(e) {}
-}
-
-range.addEventListener("change", () => {
-    Object.keys(charts).forEach(s => {
-        charts[s].data.datasets[0].data = filterHistory(s);
-        charts[s].update();
+    const res = await fetch(`${API_URL}/api/messages`);
+    const data = await res.json();
+    const box = document.getElementById("chatBox");
+    box.innerHTML = "";
+    data.forEach(m => {
+        let nameTag = m.player === "admin" ? `<span class="badge" style="background:var(--red);">DRUH</span>` : `<b>${m.player}</b>`;
+        box.innerHTML += `<div>${nameTag}: ${m.text}</div>`;
     });
-});
-
-function start() {
-    updateCharts();
-    loadPortfolio();
-    loadRanking();
-    loadChat();
-    setInterval(updateCharts, 3000);
-    setInterval(loadRanking, 5000);
-    setInterval(loadChat, 2000);
+    box.scrollTop = box.scrollHeight;
 }
-start();
+
+async function sendChatMessage() {
+    const txtEl = document.getElementById("chatText");
+    const text = txtEl.value.trim();
+    if(!text) return;
+    
+    await fetch(`${API_URL}/api/messages`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ player: currentUser, text: text })
+    });
+    txtEl.value = "";
+    loadChat();
+}
+
+// ---- METODY ADMINA ----
+async function adminGiveCash() {
+    const target = document.getElementById("admTarget").value.trim();
+    const cash = parseFloat(document.getElementById("admCash").value);
+    if(!target || !cash) return alert("Uzupełnij nick i kwotę!");
+    
+    const res = await fetch(`${API_URL}/api/admin/money`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username: target, amount: cash })
+    });
+    const d = await res.json();
+    alert(d.status || d.error);
+    updateGameData();
+}
+
+async function adminTrend(val) {
+    const sym = document.getElementById("admAsset").value;
+    await fetch(`${API_URL}/api/admin/trend`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ symbol: sym, trend: val })
+    });
+    alert("Rozkaz wydany. Kurs zacznie reagować.");
+}
+
+async function adminNextDay() {
+    const res = await fetch(`${API_URL}/api/admin/next-day`, {method: "POST"});
+    const d = await res.json();
+    alert(d.status || d.error);
+    updateGameData();
+}
+
+function startCycles() {
+    updateGameData();
+    loadChat();
+    setInterval(updateGameData, 4000);
+    setInterval(loadChat, 3000);
+}
 </script>
 </body>
 </html>
