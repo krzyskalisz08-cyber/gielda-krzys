@@ -1,12 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import random
 import threading
 import time
+import os
 
 app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna V2")
 
+# Bezpieczne ustawienia CORS dla urządzeń na obozie
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +23,7 @@ class Transaction(BaseModel):
     username: str
     symbol: str
     type: str  # "BUY" lub "SELL_POSITION"
-    amount: float  # Może służyć jako ilość lub ID pozycji przy sprzedaży
+    amount: float
 
 class Message(BaseModel):
     player: str
@@ -34,7 +37,7 @@ class AddMoney(BaseModel):
     username: str
     amount: float
 
-# ---- BAZA DANYCH AKTYWÓW II RP (Zgodna z Twoją tabelą) ----
+# ---- BAZA DANYCH AKTYWÓW II RP (Zgodna z Twoją tabelą docx) ----
 market_assets = {
     "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "price": 100.0, "history": [100.0]},
     "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "price": 80.0, "history": [80.0]},
@@ -86,35 +89,39 @@ def market_tick_worker():
         day_trends = trends_by_day.get(day, trends_by_day[15])
         
         for sym, asset in market_assets.items():
-            trend = day_trends.get(sym, 0.02) # domyślny lekki wzrost dla brakujących
+            trend = day_trends.get(sym, 0.02)
             noise = random.uniform(-0.012, 0.012) # delikatne wahania minutowe
             
             # Wpływ decyzji zakupowych graczy
             impact = (game_state["player_impact"][sym] - 1.0) * 0.03
             
             total_change = (trend * 0.6) + (noise * 0.4) + impact
-            total_change = max(min(total_change, 0.07), -0.07) # zabezpieczenie progu 7% na minutę
+            total_change = max(min(total_change, 0.07), -0.07) # maksymalnie 7% ruchu na minutę
             
             new_price = round(asset["price"] * (1 + total_change), 2)
             if new_price < 0.10: new_price = 0.10
             
             asset["price"] = new_price
             asset["history"].append(new_price)
-            if len(asset["history"]) > 40: # Trzymaj ostatnie 40 wpisów na wykresie
+            if len(asset["history"]) > 40: # Ostatnie 40 świeczek widoczne na wykresie
                 asset["history"].pop(0)
                 
-        # Wygaszanie wpływu wolumenu graczy
+        # Powolne wygaszanie wolumenu graczy
         for sym in game_state["player_impact"]:
             game_state["player_impact"][sym] = 1.0 + (game_state["player_impact"][sym] - 1.0) * 0.85
 
-# Start wątku w tle
+# Uruchomienie automatycznego rynku minutowego w osobnym wątku
 threading.Thread(target=market_tick_worker, daemon=True).start()
 
-# ---- ENDPOINTY API ----
-@app.get("/")
-def root():
-    return {"status": "Backend Giełdy II RP działa pomyślnie"}
+# ---- INTERFEJS WIZUALNY (Zwraca plik index.html bezpośrednio na adresie głównym) ----
+@app.get("/", response_class=HTMLResponse)
+def get_gui():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Błąd: Nie znaleziono pliku index.html w tym samym folderze co main.py!</h1>"
 
+# ---- ENDPOINTY INTERFEJSU API ----
 @app.get("/api/game-data")
 def get_game_data():
     return {
@@ -129,7 +136,7 @@ def login(data: CreatePlayer):
     if p and p["password"] == data.password:
         return {"status": "ok", "username": data.username, "balance": p["balance"], "portfolio": p["portfolio"]}
     elif not p:
-        # Automatyczne zakładanie konta na obozie, żeby nie tracić czasu druha
+        # Automatyczne zakładanie konta patrolu na obozie
         game_state["players"][data.username] = {"password": data.password, "balance": 5000.0, "portfolio": []}
         return {"status": "registered", "username": data.username, "balance": 5000.0, "portfolio": []}
     raise HTTPException(status_code=401, detail="Błędne hasło patrolu!")
@@ -191,7 +198,7 @@ def add_message(msg: Message):
         game_state["messages"].pop(0)
     return {"status": "Wysłano"}
 
-# ---- PANEL DRUHA ----
+# ---- PANEL DRUHA PROWADZĄCEGO ----
 @app.post("/api/admin/next-day")
 def admin_next_day():
     if game_state["current_day"] < 15:
@@ -199,14 +206,14 @@ def admin_next_day():
         d = game_state["current_day"]
         game_state["news"].insert(0, {
             "title": f"Rozpoczęto Dzień/Rok {d} symulacji",
-            "content": "Wchodzimy w kolejną fazę makroekonomiczną. Zmiany z tabeli wchodzą w życie!"
+            "content": "Wchodzimy w kolejną fazę makroekonomiczną II RP. Śledź wykresy na żywo!"
         })
-        return {"status": f"Przewinięto do dnia {d}"}
-    return {"error": "Osiągnięto już 15. dzień obozu."}
+        return {"status": f"Przewinięto pomyślnie do dnia {d}"}
+    return {"error": "Osiągnięto już ostatni, 15. dzień obozu."}
 
 @app.post("/api/admin/money")
 def admin_give_money(data: AddMoney):
     p = game_state["players"].get(data.username)
-    if not p: raise HTTPException(status_code=404, detail="Brak patrolu.")
+    if not p: raise HTTPException(status_code=404, detail="Brak takiego patrolu.")
     p["balance"] += data.amount
-    return {"status": f"Dodano {data.amount} zł dla {data.username}"}
+    return {"status": f"Dodano pomyślnie {data.amount} zł dla {data.username}"}
