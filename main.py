@@ -7,7 +7,7 @@ import threading
 import time
 import os
 
-app = FastAPI(title="Giełda II RP - Wersja Pro Pro")
+app = FastAPI(title="Giełda II RP - Stabilna Wersja")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,7 +45,7 @@ class SetTrend(BaseModel):
 game_state = {
     "current_day": 1,
     "admin_trends": {},
-    "player_impact": {} # Śledzenie wpływu graczy na rynek, aby nie przekroczył 20%
+    "player_impact": {}
 }
 
 market_assets = {
@@ -63,8 +63,6 @@ market_assets = {
 }
 
 prices = []
-# Przechowywanie świeczek: każda świeczka to struktura: [t, o, h, l, c]
-# Budujemy oddzielne historie dla interwałów: 5m, 1h, 1d
 candles_history = {} 
 players = {}  
 messages = []
@@ -80,14 +78,14 @@ def init_game():
             "price": data["base_price"],
             "desc": data["desc"]
         })
-        game_state["player_impact"][symbol] = 1.0 # 1.0 oznacza brak wpływu (mnożnik)
+        game_state["player_impact"][symbol] = 1.0
         
-        # Inicjalizacja historii świecowej bazową ceną
         bp = data["base_price"]
+        # Inicjalizacja stabilnych punktów startowych świec
         candles_history[symbol] = {
-            "5m": [[i, bp, bp+2, bp-2, bp+random.uniform(-1,1)] for i in range(15)],
-            "1h": [[i, bp, bp+5, bp-5, bp+random.uniform(-3,3)] for i in range(15)],
-            "1d": [[i, bp, bp+10, bp-10, bp+random.uniform(-5,5)] for i in range(15)]
+            "5m": [[i, bp, bp+random.uniform(0,3), bp-random.uniform(0,3), bp+random.uniform(-1,1)] for i in range(15)],
+            "1h": [[i, bp, bp+random.uniform(0,6), bp-random.uniform(0,6), bp+random.uniform(-3,3)] for i in range(15)],
+            "1d": [[i, bp, bp+random.uniform(0,12), bp-random.uniform(0,12), bp+random.uniform(-5,5)] for i in range(15)]
         }
 
 init_game()
@@ -105,7 +103,7 @@ def get_frontend():
 def register_player(cp: CreatePlayer):
     if cp.username in players: return {"error": "Ta nazwa jest zajęta!"}
     players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio": {}}
-    return {"status": "Zarejestrowano pomyślnie"}
+    return {"status": f"Zarejestrowano pomyślnie patrol: {cp.username}"}
 
 @app.get("/api/prices")
 def get_prices():
@@ -113,7 +111,6 @@ def get_prices():
 
 @app.get("/api/candles/{symbol}/{timeframe}")
 def get_candles(symbol: str, timeframe: str):
-    # Zwraca świeczki dla wybranego symbolu i interwału (5m, 1h, 1d)
     if symbol in candles_history and timeframe in candles_history[symbol]:
         return candles_history[symbol][timeframe]
     return []
@@ -146,8 +143,8 @@ def process_transaction(tx: Transaction):
         player["portfolio"][tx.symbol] = player["portfolio"].get(tx.symbol, [])
         player["portfolio"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage})
         
-        # Wpływ zakupu gracza na rynek (popyt podnosi cenę) - max 20% limitu bezpieczeństwa
-        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.001), 1.20)
+        # Max 20% limitu bezpieczeństwa
+        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.002), 1.20)
         
     elif tx.type == "sell":
         positions = player["portfolio"].get(tx.symbol, [])
@@ -174,8 +171,8 @@ def process_transaction(tx: Transaction):
         player["balance"] += max(refund, 0.0)
         player["portfolio"][tx.symbol] = positions
         
-        # Wpływ sprzedaży gracza na rynek (podaż obniża cenę) - min 20% spadek limitu bezpieczeństwa
-        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.001), 0.80)
+        # Max 20% limitu bezpieczeństwa
+        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.002), 0.80)
 
     return {"status": "ok"}
 
@@ -195,7 +192,7 @@ def admin_set_trend(data: SetTrend):
 def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
-        return {"status": f"Dzień {game_state['current_day']}"}
+        return {"status": f"Nastał Dzień {game_state['current_day']}"}
     return {"error": "Koniec gry"}
 
 @app.get("/api/messages")
@@ -206,58 +203,50 @@ def add_message(msg: Message):
     messages.append(msg)
     return {"status": "ok"}
 
-# ---------------- GENERATOR ŚWIECZEK I RYNKU PRO ----------------
+# ---------------- SILNIK GIEŁDOWY ----------------
 def market_engine():
     tick_count = 15
     while True:
-        time.sleep(4) # Odświeżenie rynku co 4 sekundy
+        time.sleep(4) # Aktualizacja co 4 sekundy
         tick_count += 1
         
         for p in prices:
             sym = p["symbol"]
             open_p = p["price"]
             
-            # 1. Losowy ruch bazy
             change = random.uniform(-0.012, 0.012)
-            
-            # 2. Wpływ historyczny dni obozu
             day = game_state["current_day"]
             if sym == "PORT" and day > 3: change += 0.003
             if sym == "COP" and day < 6: change -= 0.005
             if sym == "COP" and day >= 6: change += 0.009
             if sym == "STAL" and day > 8: change += 0.005
             
-            # 3. Wpływ administratora
             if sym in game_state["admin_trends"]:
                 change += game_state["admin_trends"][sym]
             
-            # Obliczenie ceny bazowej po trendach
             base_calculated_price = open_p * (1 + change)
-            
-            # 4. ZASTOSOWANIE LIMITU WPŁYWU GRACZY (Maksymalnie od 0.80x do 1.20x ceny bazowej, czyli max 20%)
             impact_modifier = game_state["player_impact"][sym]
             final_price = round(max(base_calculated_price * impact_modifier, 0.1), 2)
             
             p["price"] = final_price
             close_p = final_price
             
-            # Tworzenie sztucznych wartości High/Low dla świecy w danym tiku
-            high_p = round(max(open_p, close_p) + random.uniform(0, 2), 2)
-            low_p = round(min(open_p, close_p) - random.uniform(0, 2), 2)
+            high_p = round(max(open_p, close_p) + random.uniform(0.05, 1.5), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.05, 1.5), 0.05), 2)
             
-            # Aktualizacja historii świecowej dla trzech ram czasowych (Timeframes)
             for tf in ["5m", "1h", "1d"]:
                 hist = candles_history[sym][tf]
-                # Co parę sekund symulujemy zamknięcie starej świecy i otwarcie nowej
+                # Co 5 tików zamykamy starą świeczkę i otwieramy nową
                 if tick_count % 5 == 0 or len(hist) == 0:
                     hist.append([tick_count, open_p, high_p, low_p, close_p])
                 else:
-                    # Aktualizujemy ostatnią świecę na żywo
                     last = hist[-1]
-                    last[2] = max(last[2], high_p) # nowy High
-                    last[3] = min(last[3], low_p)  # nowy Low
-                    last[4] = close_p             # nowy Close
+                    last[2] = max(last[2], high_p)
+                    last[3] = min(last[3], low_p)
+                    last[4] = close_p
                 
-                if len(hist) > 25: hist.shift()
+                # Naprawiony bezpiecznik ograniczenia historii (zamiast .shift() używamy wycinania)
+                if len(hist) > 22:
+                    candles_history[sym][tf] = hist[-22:]
 
 threading.Thread(target=market_engine, daemon=True).start()

@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giełda II RP - Profesjonalne Świece</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+    <title>Giełda II RP - Panel Handlowy</title>
     <style>
         :root {
             --bg: #0b0d0b;
-            --card: #141913;
+            --card: #131812;
             --text: #e2e8e0;
             --khaki: #9ca974;
             --green: #26a69a;
@@ -19,7 +17,7 @@
         body { background: var(--bg); color: var(--text); margin: 0; padding: 8px; }
         h1, h2, h3 { text-align: center; color: var(--khaki); margin: 8px 0; font-weight: 600; }
         .card { background: var(--card); padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #232c21; }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #000; color: #fff; font-size: 15px; }
+        input, select, button { width: 100%; padding: 11px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #000; color: #fff; font-size: 15px; }
         button { background: var(--khaki); color: #000; cursor: pointer; border: none; font-weight: bold; }
         .btn-buy { background: var(--green); color: white; width: 49%; }
         .btn-sell { background: var(--red); color: white; width: 49%; }
@@ -34,7 +32,8 @@
         
         .tf-btn { background: #222; color: #aaa; padding: 4px 10px; font-size: 11px; border-radius: 4px; width: auto; display: inline-block; margin: 2px; }
         .tf-btn.active { background: var(--khaki); color: black; }
-        .canvas-container { width: 100%; height: 160px; margin-top: 5px; background: #000; border-radius: 4px; padding: 3px; position: relative; }
+        .canvas-container { width: 100%; height: 140px; margin-top: 5px; background: #000; border-radius: 4px; position: relative; border: 1px solid #1a1f19; }
+        canvas { width: 100%; height: 100%; display: block; }
         
         #chatBox { height: 130px; overflow-y: auto; background: #050505; padding: 6px; font-size: 13px; border-radius: 4px; margin-bottom: 5px; border: 1px solid #222; }
         .badge { background: var(--red); padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: bold; }
@@ -45,44 +44,54 @@
 
     <div id="loginPage" style="display: block; max-width: 380px; margin: 50px auto;">
         <h1>🏕️ GIEŁDA II RP</h1>
-        <h3 style="color:#666;">System Handlowy Wojska Polskiego</h3>
+        <h3 style="color:#666; font-size: 13px;">Terminal Handlowy Wojska Polskiego</h3>
         <div class="card">
             <input id="loginUser" placeholder="Kryptonim Patrolu / Nick">
             <input id="loginPass" type="password" placeholder="Hasło radiostacji">
             <button onclick="login()">ZALOGUJ SYSTEM</button>
-            <button onclick="register()" style="background:#222; color:white; margin-top:10px;">ZAREJESTRUJ NOWY PATROL</button>
         </div>
     </div>
 
     <div id="gamePage">
         <div class="card" style="text-align: center; background: var(--khaki); color: black; padding: 8px;">
-            <span id="displayUser" style="font-weight:bold; font-size:16px;">Patrol</span> | 
+            <span id="displayUser" style="font-weight:bold; font-size:15px;">Patrol</span> | 
             <span>Środki: <b id="displayBalance">5000.00</b> zł</span> | 
             <span>📅 <b>Dzień: <span id="displayDay">1</span>/15</b></span>
         </div>
 
         <div id="adminPanel" class="card">
-            <h3 style="color:var(--red); margin: 0 0 8px 0;">⚒️ CENTRUM DOWODZENIA (ADMIN)</h3>
+            <h3 style="color:var(--red); margin: 0 0 8px 0;">⚒️ STRATEGICZNE DOWODZENIE (DRUH ADMIN)</h3>
+            
+            <label style="font-size:12px; color:var(--khaki);">Dodaj finanse dla patrolu:</label>
             <div class="flex-row">
                 <input id="admTarget" placeholder="Nick patrolu" style="width:45%;">
                 <input id="admCash" type="number" placeholder="Zł" style="width:30%;">
                 <button onclick="adminGiveCash()" style="background:var(--green); width:25%;">DAJ</button>
             </div>
-            <select id="admAsset" style="margin-top:5px;"></select>
+            
+            <label style="font-size:12px; color:var(--khaki); margin-top:10px; display:block;">Rejestracja nowego patrolu w grze:</label>
             <div class="flex-row">
-                <button onclick="adminTrend(-0.05)" style="background:var(--red); color:white;">WYWOŁAJ KRYZYS</button>
-                <button onclick="adminTrend(0.05)" style="background:var(--green); color:white;">STYMULUJ HOSSĘ</button>
+                <input id="regUser" placeholder="Nowy Nick" style="width:40%;">
+                <input id="regPass" placeholder="Nowe Hasło" style="width:40%;">
+                <button onclick="adminRegisterPatrol()" style="background:var(--khaki); color:black; width:20%;">DODAJ</button>
             </div>
-            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:6px;">🔔 NASTĘPNY ROK (DZIEŃ OBOZU)</button>
+
+            <label style="font-size:12px; color:var(--khaki); margin-top:10px; display:block;">Sterowanie rynkiem:</label>
+            <select id="admAsset" style="margin-top:2px;"></select>
+            <div class="flex-row">
+                <button onclick="adminTrend(-0.04)" style="background:var(--red); color:white;">WYWOŁAJ KRYZYS</button>
+                <button onclick="adminTrend(0.04)" style="background:var(--green); color:white;">STYMULUJ HOSSĘ</button>
+            </div>
+            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:8px;">🔔 NASTĘPNY ROK GRAFIKA (DZIEŃ OBOZU)</button>
         </div>
 
         <div class="card">
-            <h3>📈 TERMINAL TRANSAKCYJNY</h3>
+            <h3>📈 INTERAKTYWNE ŚWIECE LIVE</h3>
             <div id="marketList"></div>
         </div>
 
         <div class="card">
-            <h3>🛒 NOWE ZLECENIE (Z DŹWIGNIĄ)</h3>
+            <h3>🛒 ZLECENIE HANDLOWE</h3>
             <div class="flex-row">
                 <select id="tradeAsset" style="width: 50%;"></select>
                 <select id="tradeLeverage" style="width: 50%;">
@@ -106,7 +115,7 @@
         </div>
 
         <div class="card">
-            <h3>🏆 STRATEGICZNA TABLICA WYNIKÓW</h3>
+            <h3>🏆 TABLICA GRY</h3>
             <div id="rankingList" style="font-size:13px; line-height:1.4;"></div>
         </div>
 
@@ -124,8 +133,7 @@
 const API_URL = window.location.origin;
 let currentUser = "";
 let currentPass = "";
-let chartInstances = {};
-let selectedTimeframes = {}; // Przechowuje aktualną ramę dla każdej spółki (domyślnie 5m)
+let selectedTimeframes = {}; 
 
 function toggleDesc(id) {
     const el = document.getElementById('desc-' + id);
@@ -134,21 +142,9 @@ function toggleDesc(id) {
 
 function changeTimeframe(symbol, tf) {
     selectedTimeframes[symbol] = tf;
-    // Aktualizujemy podświetlenie przycisków interwałów
     document.querySelectorAll(`.btn-${symbol}`).forEach(btn => btn.classList.remove('active'));
     document.getElementById(`btn-${symbol}-${tf}`).classList.add('active');
-    renderChart(symbol);
-}
-
-async function register() {
-    const u = document.getElementById("loginUser").value.trim();
-    const p = document.getElementById("loginPass").value.trim();
-    if(!u || !p) return alert("Uzupełnij pola!");
-    const res = await fetch(`${API_URL}/api/register`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username: u, password: p })
-    });
-    const d = await res.json(); alert(d.status || d.error);
+    drawCandles(symbol);
 }
 
 async function login() {
@@ -167,6 +163,21 @@ async function login() {
     startCycles();
 }
 
+async function adminRegisterPatrol() {
+    const u = document.getElementById("regUser").value.trim();
+    const p = document.getElementById("regPass").value.trim();
+    if(!u || !p) return alert("Uzupełnij login i hasło nowego patrolu!");
+    
+    const res = await fetch(`${API_URL}/api/register`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await res.json(); 
+    alert(d.status || d.error);
+    document.getElementById("regUser").value = "";
+    document.getElementById("regPass").value = "";
+}
+
 async function initMarketHTML() {
     const res = await fetch(`${API_URL}/api/prices`);
     const assets = await res.json();
@@ -177,7 +188,7 @@ async function initMarketHTML() {
     marketDiv.innerHTML = ""; tradeSelect.innerHTML = ""; admSelect.innerHTML = "";
     
     assets.forEach(a => {
-        selectedTimeframes[a.symbol] = "5m"; // Domyślna rama czasowa
+        selectedTimeframes[a.symbol] = "5m"; 
         
         marketDiv.innerHTML += `
             <div class="asset-box">
@@ -192,7 +203,7 @@ async function initMarketHTML() {
                     <button id="btn-${a.symbol}-1d" class="tf-btn btn-${a.symbol}" onclick="changeTimeframe('${a.symbol}', '1d')">1 DZIEŃ</button>
                 </div>
                 <div class="canvas-container">
-                    <canvas id="chart-${a.symbol}"></canvas>
+                    <canvas id="canvas-${a.symbol}"></canvas>
                 </div>
             </div>`;
             
@@ -201,36 +212,78 @@ async function initMarketHTML() {
     });
 }
 
-async function renderChart(symbol) {
+// Ultra stabilny, natywny silnik rysowania świec bezpośrednio na pikselach ekranu Canvas
+async function drawCandles(symbol) {
+    const canvas = document.getElementById(`canvas-${symbol}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
     const tf = selectedTimeframes[symbol] || "5m";
     const res = await fetch(`${API_URL}/api/candles/${symbol}/${tf}`);
     const candleData = await res.json();
+    if (!candleData || candleData.length === 0) return;
+
+    // Dopasowanie fizycznych pikseli do rozdzielczości ekranu telefonu
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Szukanie skrajnych wartości, aby automatycznie wyskalować oś Y
+    let minP = Infinity, maxP = -Infinity;
+    candleData.forEach(c => {
+        if(c[3] < minP) minP = c[3]; // low
+        if(c[2] > maxP) maxP = c[2]; // high
+    });
     
-    // Formatowanie danych pod strukturę świecową typu: {x, o, h, l, c}
-    const formatted = candleData.map(c => ({ x: c[0], o: c[1], h: c[2], l: c[3], c: c[4] }));
-    const canvasCtx = document.getElementById(`chart-${symbol}`);
-    if (!canvasCtx) return;
-    
-    if (chartInstances[symbol]) {
-        chartInstances[symbol].destroy(); // Czyścimy stary wykres przed rysowaniem nowej ramy
+    // Margines bezpieczeństwa u góry i dołu wykresu
+    minP -= (maxP - minP) * 0.1 || 2;
+    maxP += (maxP - minP) * 0.1 || 2;
+
+    const count = candleData.length;
+    const candleWidth = (w / count) * 0.7;
+    const spacing = w / count;
+
+    // Rysowanie siatki cenowej w tle
+    ctx.strokeStyle = "#161a14";
+    ctx.lineWidth = 1;
+    for(let i = 1; i < 4; i++) {
+        let yGrid = (h / 4) * i;
+        ctx.beginPath(); ctx.moveTo(0, yGrid); ctx.lineTo(w, yGrid); ctx.stroke();
     }
-    
-    chartInstances[symbol] = new Chart(canvasCtx.getContext('2d'), {
-        type: 'candlestick',
-        data: {
-            datasets: [{
-                data: formatted,
-                color: { up: '#26a69a', down: '#ef5350', unch: '#999' } // Kolory giełdowe świec
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { color: '#111' }, ticks: { display: false } },
-                y: { grid: { color: '#161a14' }, ticks: { color: '#666', font: { size: 9 } } }
-            }
-        }
+
+    // Mapowanie matematyczne wartości cen do pozycji pikselowej na wykresie
+    function getX(index) { return index * spacing + spacing / 2; }
+    function getY(price) { return h - ((price - minP) / (maxP - minP)) * h; }
+
+    candleData.forEach((c, idx) => {
+        const [t, open, high, low, close] = c;
+        const x = getX(idx);
+        const yOpen = getY(open);
+        const yClose = getY(close);
+        const yHigh = getY(high);
+        const yLow = getY(low);
+
+        const isUp = close >= open;
+        ctx.strokeStyle = isUp ? "#26a69a" : "#ef5350";
+        ctx.fillStyle = isUp ? "#26a69a" : "#ef5350";
+        ctx.lineWidth = 2;
+
+        // 1. Knot świecy (High - Low)
+        ctx.beginPath();
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+
+        // 2. Słupek korpusu (Open - Close)
+        const bodyHeight = Math.abs(yClose - yOpen) || 2; // Minimalna grubość 2px
+        const bodyY = Math.min(yOpen, yClose);
+        ctx.fillRect(x - candleWidth / 2, bodyY, candleWidth, bodyHeight);
     });
 }
 
@@ -243,7 +296,7 @@ async function updateGameData() {
     assets.forEach(a => {
         const lbl = document.getElementById(`price-${a.symbol}`);
         if(lbl) lbl.innerText = `${a.price.toFixed(2)} zł`;
-        renderChart(a.symbol); // Odświeża świeczkę na wykresie
+        drawCandles(a.symbol); 
     });
 
     const resPlayer = await fetch(`${API_URL}/api/player/${currentUser}/${currentPass}`);
@@ -257,7 +310,7 @@ async function updateGameData() {
         pData.portfolio[sym].forEach(pos => {
             if(pos.amount > 0) {
                 hasAsset = true;
-                portDiv.innerHTML += `💼 <b>${sym}</b>: ${pos.amount.toFixed(1)} szt. | Kupiłeś po: ${pos.buy_price.toFixed(2)} zł | Dźwignia: <b>${pos.leverage}x</b><br>`;
+                portDiv.innerHTML += `💼 <b>${sym}</b>: ${pos.amount.toFixed(1)} szt. | Kurs kupna: ${pos.buy_price.toFixed(2)} zł | Dźwignia: <b>${pos.leverage}x</b><br>`;
             }
         });
     });
@@ -318,7 +371,7 @@ async function adminTrend(val) {
         method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ symbol: sym, trend: val })
     });
-    alert("Zlecenie modyfikacji wysłane.");
+    alert("Zlecenie modyfikacji trendu wysłane.");
 }
 
 async function adminNextDay() {
