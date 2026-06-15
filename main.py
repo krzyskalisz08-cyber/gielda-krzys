@@ -2,13 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from datetime import datetime
 import random
 import threading
 import time
 import os
 
-app = FastAPI(title="Giełda II RP - Obóz Harcerski")
+app = FastAPI(title="Giełda II RP - Wersja Pro Pro")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,7 +23,7 @@ class Transaction(BaseModel):
     symbol: str
     type: str # "buy" / "sell"
     amount: float
-    leverage: int # 1, 2, 3, 4, 5
+    leverage: int
 
 class Message(BaseModel):
     player: str
@@ -40,39 +39,38 @@ class AddMoney(BaseModel):
 
 class SetTrend(BaseModel):
     symbol: str
-    trend: float # -0.1 do 0.1 (modyfikator ręczny admina)
+    trend: float
 
 # ---------------- STRUKTURA DANYCH II RP ----------------
-# Gra symuluje 15 dni (każdy dzień to skok w historii o ponad rok, aby zamknąć 20 lat II RP)
 game_state = {
     "current_day": 1,
-    "admin_trends": {} # Ręczne manipulacje admina na wykresach
+    "admin_trends": {},
+    "player_impact": {} # Śledzenie wpływu graczy na rynek, aby nie przekroczył 20%
 }
 
-# Memorandum i baza spółek + surowców
 market_assets = {
-    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "risk": "medium", "type": "company", "desc": "Budowa przynosi 40-60 mln zł rocznie. Koszt: 300 mln. Ryzyko średnie przez sytuację międzynarodową. Stabilny wzrost w długiej perspektywie."},
-    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "risk": "low", "type": "company", "desc": "Transport węgla. Przychody 30-50 mln zł rocznie. Koszt: 250 mln. Niskie ryzyko, stabilny popyt na węgiel."},
-    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 250.0, "risk": "high", "type": "company", "desc": "Strategiczny projekt państwowy. Koszt >3 mld zł. Początkowe straty, ale gigantyczny potencjał długoterminowy i zyski rzędu 100-150 mln zł."},
-    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 50.0, "risk": "medium", "type": "company", "desc": "Produkcja nawozów dla rolnictwa. Koszt: 100 mln. Zysk netto 5-8 mln rocznie. Stabilny popyt, ryzyko umiarkowane (ceny surowców)."},
-    "STAL": {"name": "Stalowa Wola", "base_price": 120.0, "risk": "high", "type": "company", "desc": "Przemysł ciężki i wojskowy. Koszt: 200 mln. Przychody 50-80 mln rocznie. Zależne od zamówień rządowych i obronnych."},
-    "KOLEJ": {"name": "Spółka Kolejowa (PKP)", "base_price": 150.0, "risk": "low", "type": "company", "desc": "Modernizacja sieci. Koszt: 500 mln. Przychody 100-150 mln rocznie. Podstawa transportu kraju, bardzo bezpieczna lokata."},
-    "AUTO": {"name": "Fabryka Samochodów", "base_price": 70.0, "risk": "high", "type": "company", "desc": "Budowa pod Warszawą. Koszt: 150 mln. Rynek dopiero startuje, wysoka niepewność popytu, ale szansa na dynamiczny skok technologiczny."},
-    "ZLOTO": {"name": "Złoto (PZBP)", "base_price": 45.0, "type": "resource", "desc": "Kruszec lokacyjny, bezpieczna przystań w czasach niepewności geopolitycznej II RP."},
-    "MIEDZ": {"name": "Miedź", "base_price": 15.0, "type": "resource", "desc": "Surowiec strategiczny dla rozbudowy elektryczności i przemysłu zbrojeniowego COP."},
-    "SREBRO": {"name": "Srebro", "base_price": 22.0, "type": "resource", "desc": "Wykorzystywane w przemyśle oraz do bicia monet obiegowych w II RP."},
-    "USD": {"name": "Dolar Amerykański", "base_price": 5.30, "type": "resource", "desc": "Twarda waluta zagraniczna. Kurs zależny od stabilizacji złotego i sytuacji na świecie."}
+    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Budowa przynosi 40-60 mln zł rocznie. Koszt: 300 mln. Ryzyko średnie. Stabilny wzrost w długiej perspektywie."},
+    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Transport węgla. Przychody 30-50 mln zł rocznie. Koszt: 250 mln. Niskie ryzyko, stabilny popyt."},
+    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 250.0, "desc": "Strategiczny projekt państwowy. Koszt >3 mld zł. Początkowe straty, potem potężne zyski (100-150 mln)."},
+    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 50.0, "desc": "Produkcja nawozów. Koszt: 100 mln. Zysk 5-8 mln rocznie. Stabilny popyt, ryzyko umiarkowane."},
+    "STAL": {"name": "Stalowa Wola", "base_price": 120.0, "desc": "Przemysł ciężki i wojskowy. Koszt: 200 mln. Zależne od zamówień rządowych i obronnych."},
+    "KOLEJ": {"name": "Spółka Kolejowa (PKP)", "base_price": 150.0, "desc": "Modernizacja sieci. Koszt: 500 mln. Bardzo bezpieczna lokata, podstawa gospodarki."},
+    "AUTO": {"name": "Fabryka Samochodów", "base_price": 70.0, "desc": "Budowa pod Warszawą. Koszt: 150 mln. Wysoka niepewność popytu, rynek dopiero startuje."},
+    "ZLOTO": {"name": "Złoto (PZBP)", "base_price": 45.0, "desc": "Kruszec lokacyjny, bezpieczna przystań w czasach niepewności geopolitycznej."},
+    "MIEDZ": {"name": "Miedź", "base_price": 15.0, "desc": "Surowiec strategiczny dla elektryczności i przemysłu zbrojeniowego COP."},
+    "SREBRO": {"name": "Srebro", "base_price": 22.0, "desc": "Wykorzystywane w przemyśle oraz do bicia monet obiegowych w II RP."},
+    "USD": {"name": "Dolar Amerykański", "base_price": 5.30, "desc": "Twarda waluta zagraniczna. Kurs zależny od sytuacji na świecie."}
 }
 
 prices = []
-players = {}  # username -> {password, balance, portfolio: {symbol: {amount, buy_price, leverage}}}
+# Przechowywanie świeczek: każda świeczka to struktura: [t, o, h, l, c]
+# Budujemy oddzielne historie dla interwałów: 5m, 1h, 1d
+candles_history = {} 
+players = {}  
 messages = []
 
-# Inicjalizacja domyślnych graczy i cen
 def init_game():
-    # Konto admina
     players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio": {}}
-    # Pierwszy gracz testowy
     players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio": {}}
     
     for symbol, data in market_assets.items():
@@ -80,13 +78,20 @@ def init_game():
             "symbol": symbol,
             "name": data["name"],
             "price": data["base_price"],
-            "type": data["type"],
             "desc": data["desc"]
         })
+        game_state["player_impact"][symbol] = 1.0 # 1.0 oznacza brak wpływu (mnożnik)
+        
+        # Inicjalizacja historii świecowej bazową ceną
+        bp = data["base_price"]
+        candles_history[symbol] = {
+            "5m": [[i, bp, bp+2, bp-2, bp+random.uniform(-1,1)] for i in range(15)],
+            "1h": [[i, bp, bp+5, bp-5, bp+random.uniform(-3,3)] for i in range(15)],
+            "1d": [[i, bp, bp+10, bp-10, bp+random.uniform(-5,5)] for i in range(15)]
+        }
 
 init_game()
 
-# ---- SERWOWANIE FRONTENDU ----
 @app.get("/", response_class=HTMLResponse)
 def get_frontend():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -94,163 +99,165 @@ def get_frontend():
     if os.path.exists(html_path):
         with open(html_path, "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>Błąd: Serwer działa, ale nie znaleziono pliku index.html</h1>"
+    return "<h1>Błąd: Brak pliku index.html</h1>"
 
-# ---------------- ENDPOINTY GRACZY & ADMINA ----------------
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
-    if cp.username in players:
-        return {"error": "Ta nazwa użytkownika jest zajęta!"}
-    players[cp.username] = {
-        "password": cp.password,
-        "balance": 5000.0, # Początkowy żołd na obozie
-        "portfolio": {}
-    }
+    if cp.username in players: return {"error": "Ta nazwa jest zajęta!"}
+    players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio": {}}
     return {"status": "Zarejestrowano pomyślnie"}
 
 @app.get("/api/prices")
 def get_prices():
     return prices
 
+@app.get("/api/candles/{symbol}/{timeframe}")
+def get_candles(symbol: str, timeframe: str):
+    # Zwraca świeczki dla wybranego symbolu i interwału (5m, 1h, 1d)
+    if symbol in candles_history and timeframe in candles_history[symbol]:
+        return candles_history[symbol][timeframe]
+    return []
+
 @app.get("/api/player/{username}/{password}")
 def get_player_data(username: str, password: str):
     if username not in players or players[username]["password"] != password:
         return {"error": "Błędny login lub hasło"}
-    return {
-        "balance": players[username]["balance"],
-        "portfolio": players[username]["portfolio"],
-        "current_day": game_state["current_day"]
-    }
+    return {"balance": players[username]["balance"], "portfolio": players[username]["portfolio"], "current_day": game_state["current_day"]}
 
 @app.get("/api/ranking")
 def get_ranking():
-    ranking_list = []
-    for user, data in players.items():
-        if user == "admin": continue
-        ranking_list.append({"name": user, "balance": data["balance"]})
+    ranking_list = [{"name": u, "balance": d["balance"]} for u, d in players.items() if u != "admin"]
     return sorted(ranking_list, key=lambda x: x["balance"], reverse=True)
 
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
-    if tx.username not in players:
-        return {"error": "Użytkownik nie istnieje"}
-    
+    if tx.username not in players: return {"error": "Użytkownik nie istnieje"}
     player = players[tx.username]
-    asset_price = next((p["price"] for p in prices if p["symbol"] == tx.symbol), None)
+    idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
+    if idx is None: return {"error": "Brak aktywa"}
     
-    if not asset_price:
-        return {"error": "Nie znaleziono aktywów"}
-        
+    asset_price = prices[idx]["price"]
+    
     if tx.type == "buy":
-        # Koszt zakupu przy uwzględnieniu dźwigni finansowej (leverage)
-        # Przy dźwigni 5x, gracz płaci tylko 1/5 ceny jako depozyt
         required_margin = (asset_price * tx.amount) / tx.leverage
-        if player["balance"] < required_margin:
-            return {"error": "Masz za mało pieniędzy (brak depozytu zabezpieczającego)!"}
-            
-        player["balance"] -= required_margin
+        if player["balance"] < required_margin: return {"error": "Masz za mało pieniędzy!"}
         
-        if tx.symbol not in player["portfolio"]:
-            player["portfolio"][tx.symbol] = []
-            
-        player["portfolio"][tx.symbol].append({
-            "amount": tx.amount,
-            "buy_price": asset_price,
-            "leverage": tx.leverage
-        })
+        player["balance"] -= required_margin
+        player["portfolio"][tx.symbol] = player["portfolio"].get(tx.symbol, [])
+        player["portfolio"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage})
+        
+        # Wpływ zakupu gracza na rynek (popyt podnosi cenę) - max 20% limitu bezpieczeństwa
+        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.001), 1.20)
         
     elif tx.type == "sell":
         positions = player["portfolio"].get(tx.symbol, [])
-        if not positions:
-            return {"error": "Nie posiadasz tego aktywa!"}
-            
-        # Zamykamy pierwszą otwartą pozycję (FIFO) pasującą ilością
         total_owned = sum(pos["amount"] for pos in positions)
-        if total_owned < tx.amount:
-            return {"error": "Chcesz sprzedać więcej niż posiadasz!"}
-            
-        # Prosta mechanika zamknięcia całości dla uproszczenia mobilnego handlu
+        if total_owned < tx.amount: return {"error": "Nie masz tylu akcji!"}
+        
         amount_to_remove = tx.amount
         refund = 0
-        
         for pos in list(positions):
             if amount_to_remove <= 0: break
             if pos["amount"] <= amount_to_remove:
-                # Obliczanie zysku/straty z dźwignią
-                price_diff = asset_price - pos["buy_price"]
-                position_profit = (price_diff * pos["amount"]) * pos["leverage"]
-                initial_margin = (pos["buy_price"] * pos["amount"]) / pos["leverage"]
-                
-                refund += (initial_margin + position_profit)
+                profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
+                margin = (pos["buy_price"] * pos["amount"]) / pos["leverage"]
+                refund += (margin + profit)
                 amount_to_remove -= pos["amount"]
                 positions.remove(pos)
             else:
-                # Częściowe zamknięcie pozycji
-                fraction = amount_to_remove / pos["amount"]
-                price_diff = asset_price - pos["buy_price"]
-                position_profit = (price_diff * amount_to_remove) * pos["leverage"]
-                initial_margin = (pos["buy_price"] * amount_to_remove) / pos["leverage"]
-                
-                refund += (initial_margin + position_profit)
+                profit = ((asset_price - pos["buy_price"]) * amount_to_remove) * pos["leverage"]
+                margin = (pos["buy_price"] * amount_to_remove) / pos["leverage"]
+                refund += (margin + profit)
                 pos["amount"] -= amount_to_remove
                 amount_to_remove = 0
                 
-        player["balance"] += max(refund, 0.0) # Zapobiega ujemnemu zwrotowi ponad depozyt
+        player["balance"] += max(refund, 0.0)
         player["portfolio"][tx.symbol] = positions
+        
+        # Wpływ sprzedaży gracza na rynek (podaż obniża cenę) - min 20% spadek limitu bezpieczeństwa
+        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.001), 0.80)
 
     return {"status": "ok"}
 
-# ---------------- PANEL ADMINISTRATORA ----------------
 @app.post("/api/admin/money")
 def admin_add_money(data: AddMoney):
     if data.username in players:
         players[data.username]["balance"] += data.amount
-        return {"status": f"Dodano {data.amount} zł użytkownikowi {data.username}"}
+        return {"status": f"Dodano {data.amount} zł"}
     return {"error": "Brak gracza"}
 
 @app.post("/api/admin/trend")
 def admin_set_trend(data: SetTrend):
     game_state["admin_trends"][data.symbol] = data.trend
-    return {"status": f"Ustawiono trend dla {data.symbol}"}
+    return {"status": "Trend zmieniony"}
 
 @app.post("/api/admin/next-day")
 def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
-        return {"status": f"Nastał dzień {game_state['current_day']} (Kolejny rok rozwoju II RP)"}
-    return {"error": "Osiągnięto już 15 dzień obozu (koniec symulacji 20-lecia)!"}
+        return {"status": f"Dzień {game_state['current_day']}"}
+    return {"error": "Koniec gry"}
 
 @app.get("/api/messages")
-def get_messages():
-    return messages[-30:]
+def get_messages(): return messages[-30:]
 
 @app.post("/api/messages")
 def add_message(msg: Message):
     messages.append(msg)
     return {"status": "ok"}
 
-# ---------------- SILNIK SYMULACJI GOSPODARCZEJ II RP ----------------
+# ---------------- GENERATOR ŚWIECZEK I RYNKU PRO ----------------
 def market_engine():
+    tick_count = 15
     while True:
-        time.sleep(4) # Ceny aktualizują się płynnie w tle co 4 sekundy
+        time.sleep(4) # Odświeżenie rynku co 4 sekundy
+        tick_count += 1
+        
         for p in prices:
-            symbol = p["symbol"]
-            # Podstawowy losowy ruch rynkowy
-            change_percent = random.uniform(-0.02, 0.02)
+            sym = p["symbol"]
+            open_p = p["price"]
             
-            # Wpływ roku / dnia obozowego na konkretne gałęzie gospodarki II RP
+            # 1. Losowy ruch bazy
+            change = random.uniform(-0.012, 0.012)
+            
+            # 2. Wpływ historyczny dni obozu
             day = game_state["current_day"]
-            if symbol == "PORT" and day > 3: change_percent += 0.005 # Port w Gdyni rusza na pełne obroty
-            if symbol == "COP" and day < 6: change_percent -= 0.008 # Budowa COP pochłania gigantyczne koszty (początkowe spadki)
-            if symbol == "COP" and day >= 6: change_percent += 0.012 # Po 6 dniu COP generuje potężne zyski
-            if symbol == "STAL" and day > 8: change_percent += 0.007 # Produkcja zbrojeniowa Stalowej Woli rośnie przed 1939 r.
-            if symbol == "AUTO" and day > 10: change_percent += random.uniform(-0.04, 0.05) # Wysokie ryzyko fabryki aut
+            if sym == "PORT" and day > 3: change += 0.003
+            if sym == "COP" and day < 6: change -= 0.005
+            if sym == "COP" and day >= 6: change += 0.009
+            if sym == "STAL" and day > 8: change += 0.005
             
-            # Wpływ ingerencji dh. Administratora
-            if symbol in game_state["admin_trends"]:
-                change_percent += game_state["admin_trends"][symbol]
+            # 3. Wpływ administratora
+            if sym in game_state["admin_trends"]:
+                change += game_state["admin_trends"][sym]
+            
+            # Obliczenie ceny bazowej po trendach
+            base_calculated_price = open_p * (1 + change)
+            
+            # 4. ZASTOSOWANIE LIMITU WPŁYWU GRACZY (Maksymalnie od 0.80x do 1.20x ceny bazowej, czyli max 20%)
+            impact_modifier = game_state["player_impact"][sym]
+            final_price = round(max(base_calculated_price * impact_modifier, 0.1), 2)
+            
+            p["price"] = final_price
+            close_p = final_price
+            
+            # Tworzenie sztucznych wartości High/Low dla świecy w danym tiku
+            high_p = round(max(open_p, close_p) + random.uniform(0, 2), 2)
+            low_p = round(min(open_p, close_p) - random.uniform(0, 2), 2)
+            
+            # Aktualizacja historii świecowej dla trzech ram czasowych (Timeframes)
+            for tf in ["5m", "1h", "1d"]:
+                hist = candles_history[sym][tf]
+                # Co parę sekund symulujemy zamknięcie starej świecy i otwarcie nowej
+                if tick_count % 5 == 0 or len(hist) == 0:
+                    hist.append([tick_count, open_p, high_p, low_p, close_p])
+                else:
+                    # Aktualizujemy ostatnią świecę na żywo
+                    last = hist[-1]
+                    last[2] = max(last[2], high_p) # nowy High
+                    last[3] = min(last[3], low_p)  # nowy Low
+                    last[4] = close_p             # nowy Close
                 
-            # Wyliczenie nowej ceny
-            p["price"] = round(max(p["price"] * (1 + change_percent), 0.1), 2)
+                if len(hist) > 25: hist.shift()
 
 threading.Thread(target=market_engine, daemon=True).start()
