@@ -18,441 +18,293 @@
         body { background: var(--bg); color: var(--text); margin: 0; padding: 10px; }
         h1, h2, h3 { text-align: center; color: var(--khaki); margin: 5px 0; font-weight: 600; }
         .card { background: var(--card); padding: 12px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #232d23; }
-        input, select, button, textarea { width: 100%; padding: 11px; margin: 5px 0; border-radius: 6px; border: 1px solid #324132; background: #000; color: #fff; font-size: 14px; }
+        input, select, button { width: 100%; padding: 11px; margin: 5px 0; border-radius: 6px; border: 1px solid #324132; background: #000; color: #fff; font-size: 14px; }
         button { background: var(--khaki); color: #000; cursor: pointer; border: none; font-weight: bold; }
-        .btn-buy { background: var(--green); color: white; width: 49%; }
-        .btn-sell { background: var(--red); color: white; width: 49%; }
+        .btn-buy { background: var(--green); color: white; width: 100%; }
         .flex-row { display: flex; justify-content: space-between; gap: 6px; }
         
         #loginPage, #gamePage { display: none; }
         .asset-box { border-bottom: 1px solid #1e261e; padding: 14px 0; }
-        .asset-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .asset-header { display: flex; justify-content: space-between; align-items: center; }
         .symbol { font-size: 16px; font-weight: bold; color: var(--khaki); }
         .price { font-size: 17px; color: var(--gold); font-weight: bold; }
-        .desc { font-size: 12.5px; color: #cedecd; margin: 6px 0; display: none; background: #050705; padding: 10px; border-radius: 4px; border: 1px solid #243324; line-height: 1.5; text-align: justify; }
         
-        .tf-btn { background: #182017; color: #888; padding: 4px 10px; font-size: 11px; border-radius: 4px; width: auto; display: inline-block; margin: 2px; border: 1px solid #273426; }
-        .tf-btn.active { background: var(--khaki); color: black; font-weight: bold; }
-        
-        .canvas-container { width: 100%; height: 180px; margin-top: 6px; background: #000; border-radius: 4px; position: relative; border: 1px solid #1c251c; padding-right: 55px; padding-bottom: 22px; }
+        .canvas-container { width: 100%; height: 140px; margin-top: 6px; background: #000; border-radius: 4px; border: 1px solid #1c251c; }
         canvas { width: 100%; height: 100%; display: block; }
         
-        #chatBox, #newsBox { height: 160px; overflow-y: auto; background: #050705; padding: 8px; font-size: 13px; border-radius: 4px; margin-bottom: 5px; border: 1px solid #212b21; }
-        .news-article { border-bottom: 1px solid #223022; padding-bottom: 8px; margin-bottom: 8px; }
-        .news-title { font-weight: bold; color: var(--gold); font-size: 14px; }
-        .news-content { font-size: 12px; color: #ddd; margin-top: 3px; line-height: 1.4; }
+        #newsBox, #chatBox { height: 110px; overflow-y: auto; background: #050705; padding: 8px; font-size: 13px; border-radius: 4px; border: 1px solid #212b21; }
+        .news-title { font-weight: bold; color: var(--gold); }
         
-        .badge { background: var(--red); padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: bold; color: white; }
+        .portfolio-table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 13px; }
+        .portfolio-table th, .portfolio-table td { padding: 8px; text-align: left; border-bottom: 1px solid #232d23; }
+        .portfolio-table th { color: var(--khaki); }
+        .pos-profit { color: var(--green); font-weight: bold; }
+        .pos-loss { color: var(--red); font-weight: bold; }
+        .btn-sell-pos { background: var(--red); color: white; padding: 4px 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; width: auto; }
         #adminPanel { display: none; border: 2px solid var(--red); background: #1f1212; }
+        .badge { background: var(--red); color: white; padding: 2px 4px; border-radius: 3px; font-size: 10px; }
     </style>
 </head>
 <body>
 
     <div id="loginPage" style="display: block; max-width: 390px; margin: 50px auto;">
         <h1>🏕️ GIEŁDA II RP</h1>
-        <h3 style="color:#607560; font-size: 13px;">Rządowy Terminal Inwestycyjny</h3>
+        <h3 style="color:#607560; font-size: 13px;">Obozowy Rządowy Terminal Inwestycyjny</h3>
         <div class="card">
-            <input id="loginUser" placeholder="Kryptonim Patrolu / Nick">
+            <input id="loginUser" placeholder="Nazwa Patrolu (np. Orły)">
             <input id="loginPass" type="password" placeholder="Hasło dostępowe">
-            <button onclick="login()">ZALOGUJ DO SYSTEMU</button>
+            <button onclick="login()">URUCHOM TERMINAL</button>
         </div>
     </div>
 
     <div id="gamePage">
         <div class="card" style="text-align: center; background: var(--khaki); color: black; padding: 10px;">
-            <span id="displayUser" style="font-weight:bold; font-size:15px;">Patrol</span> | 
-            <span>Konto: <b id="displayBalance">5000.00</b> zł</span> | 
-            <span>📅 <b>Dzień obozu: <span id="displayDay">1</span>/15</b></span>
+            <span id="displayUser" style="font-weight:bold;">Patrol</span> | 
+            <span>Środki: <b id="displayBalance">5000.00</b> zł</span> | 
+            <span>📅 <b>Rok (Dzień): <span id="displayDay">1</span>/15</b></span>
         </div>
 
         <div id="adminPanel" class="card">
-            <h3 style="color:var(--red); margin: 0 0 8px 0;">⚙️ PANEL STEROWANIA DRUHA</h3>
-            
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold;">👑 REJESTRACJA NOWEGO PATROLU:</label>
+            <h3 style="color:var(--red); margin-top:0;">⚙️ PANEL DRUHA PROWADZĄCEGO</h3>
             <div class="flex-row">
-                <input id="regUser" placeholder="Nazwa Patrolu" style="width:40%;">
-                <input id="regPass" placeholder="Hasło" style="width:40%;">
-                <button onclick="adminRegisterPatrol()" style="background:#fff; color:#000; width:20%;">DODAJ</button>
+                <input id="admTarget" placeholder="Patrol" style="width:50%;">
+                <input id="admCash" type="number" placeholder="Suma" style="width:30%;">
+                <button onclick="adminGiveCash()" style="background:var(--green); width:20%;">ZASIL</button>
             </div>
-            
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">💸 ZASILENIE FINANSOWE:</label>
-            <div class="flex-row">
-                <input id="admTarget" placeholder="Nazwa patrolu" style="width:45%;">
-                <input id="admCash" type="number" placeholder="Suma zł" style="width:30%;">
-                <button onclick="adminGiveCash()" style="background:var(--green); width:25%;">ZASIL</button>
-            </div>
-
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📢 PUBLIKACJA ARTYKUŁU / ANALIZY EKSPERCKIEJ:</label>
-            <input id="artTitle" placeholder="Tytuł artykułu (np. Kryzys w USA, Opinia Ekspertów)">
-            <textarea id="artContent" rows="2" placeholder="Treść komunikatu rynkowego, prognozy politycznej..."></textarea>
-            <button onclick="adminPublishArticle()" style="background:var(--gold); color:black; font-weight:bold;">OPUBLIKUJ NOWY ARTYKUŁ</button>
-
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📈 DOWOLNA RĘCZNA INTERWENCJA PROCENTOWA (%):</label>
-            <div class="flex-row">
-                <select id="admAsset" style="width:40%; margin:0;"></select>
-                <input id="admPercent" type="number" placeholder="Wpisz % (np. 15 lub -20)" style="width:35%; margin:0;">
-                <button onclick="adminExecutePercentChange()" style="background:var(--green); color:black; width:25%; margin:0;">ZMIEŃ %</button>
-            </div>
-            
-            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:15px; font-size:15px;">⏳ PRZEWIŃ DO NASTĘPNEGO ONTOWEGO DNIA</button>
+            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:5px;">⏳ KOLEJNY ROK HISTORII (NASTĘPNY DZIEŃ)</button>
         </div>
 
         <div class="card">
-            <h3>📢 OGŁOSZENIA, WYZWANIA I ANALIZY EKSPERCKIE</h3>
+            <h3>💼 TWOJE PORTFOLIO (OTWARTE TRANSAKCJE)</h3>
+            <table class="portfolio-table">
+                <thead>
+                    <tr>
+                        <th>Aktywo</th>
+                        <th>Ilość</th>
+                        <th>Kurs zakupu</th>
+                        <th>Wycena aktualna</th>
+                        <th>Wynik (Zysk/Strata)</th>
+                        <th>Operacja</th>
+                    </tr>
+                </thead>
+                <tbody id="portfolioEntries">
+                    <tr><td colspan="6" style="text-align:center; color:#666;">Brak aktywnych pozycji inwestycyjnych.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3>💬 ŁĄCZNOŚĆ RADIOWA (CZAT)</h3>
+            <div id="chatBox"></div>
+            <div class="flex-row" style="margin-top:5px;">
+                <input id="chatText" placeholder="Treść meldunku..." style="width:80%;">
+                <button onclick="sendChatMessage()" style="width:20%;">WYŚLIJ</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📢 DEPESZE AKADEMII GOSPODARCZEJ</h3>
             <div id="newsBox"></div>
         </div>
 
         <div class="card">
-            <h3>📈 AKTYWA RYNKOWE II RP (Kliknij aktywo, by rozwinąć Memorandum)</h3>
-            <div id="marketList"></div>
-        </div>
-
-        <div class="card">
-            <h3>🛒 SKŁADANIE ZLECEŃ HANDLOWYCH</h3>
-            <div class="flex-row">
-                <select id="tradeAsset" style="width: 50%;"></select>
-                <select id="tradeLeverage" style="width: 50%;">
-                    <option value="1">Dźwignia 1x (Brak)</option>
-                    <option value="2">Dźwignia 2x</option>
-                    <option value="3">Dźwignia 3x</option>
-                    <option value="4">Dźwignia 4x</option>
-                    <option value="5">Dźwignia 5x (Maksimum)</option>
-                </select>
-            </div>
-            <input id="tradeAmount" type="number" value="1" min="0.1" step="0.1" placeholder="Liczba jednostek">
-            <div class="flex-row">
-                <button class="btn-buy" onclick="executeTrade('buy')">KUPNO (Pozycja Long)</button>
-                <button class="btn-sell" onclick="executeTrade('sell')">SPRZEDAŻ (Pozycja Short)</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>🎒 ZABEZPIECZONE POZYCJE PATROLU</h3>
-            <div id="portfolioList" style="font-size:13px; line-height:1.4;"></div>
-        </div>
-
-        <div class="card">
-            <h3>🏆 STRATEGICZNY RANKING PATROLI</h3>
-            <div id="rankingList" style="font-size:13px; line-height:1.4;"></div>
-        </div>
-
-        <div class="card">
-            <h3>💬 RADIOTELEGRAF (KOMUNIKACJA WEWNĘTRZNA)</h3>
-            <div id="chatBox"></div>
-            <div class="flex-row">
-                <input id="chatText" placeholder="Wpisz tekst depeszy radiowej...">
-                <button onclick="sendChatMessage()" style="width:80px;">WYŚLIJ</button>
-            </div>
+            <h3>📈 RYNEK AKTYWÓW (WYKRESY MINUTOWE)</h3>
+            <div id="assetsContainer"></div>
         </div>
     </div>
 
-<script>
-const API_URL = window.location.origin;
-let currentUser = "";
-let currentPass = "";
-let selectedTimeframes = {}; 
+    <script>
+        const API_URL = window.location.origin;
+        let currentUser = "";
+        let localAssets = {};
+        let playerPortfolio = [];
 
-function toggleDesc(id) {
-    const el = document.getElementById('desc-' + id);
-    el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
+        async function login() {
+            const u = document.getElementById("loginUser").value.trim();
+            const p = document.getElementById("loginPass").value;
+            if(!u || !p) return alert("Wprowadź dane logowania!");
 
-function changeTimeframe(symbol, tf) {
-    selectedTimeframes[symbol] = tf;
-    document.querySelectorAll(`.btn-${symbol}`).forEach(btn => btn.classList.remove('active'));
-    document.getElementById(`btn-${symbol}-${tf}`).classList.add('active');
-    drawCandles(symbol);
-}
+            try {
+                const res = await fetch(`${API_URL}/api/login`, {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const d = await res.json();
+                if(res.status !== 200) return alert(d.detail);
 
-async function login() {
-    const u = document.getElementById("loginUser").value.trim();
-    const p = document.getElementById("loginPass").value.trim();
-    const res = await fetch(`${API_URL}/api/player/${u}/${p}`);
-    const d = await res.json();
-    if(d.error) return alert("Brak autoryzacji w bazie radiostacji!");
-    
-    currentUser = u; currentPass = p;
-    document.getElementById("loginPage").style.display = "none";
-    document.getElementById("gamePage").style.display = "block";
-    document.getElementById("displayUser").innerText = u.toUpperCase();
-    if(u === "admin") document.getElementById("adminPanel").style.display = "block";
-    
-    startCycles();
-}
-
-async function adminRegisterPatrol() {
-    const u = document.getElementById("regUser").value.trim();
-    const p = document.getElementById("regPass").value.trim();
-    if(!u || !p) return alert("Uzupełnij pola profilu!");
-    
-    const res = await fetch(`${API_URL}/api/register`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username: u, password: p })
-    });
-    const d = await res.json(); 
-    alert(d.status || d.error);
-    document.getElementById("regUser").value = "";
-    document.getElementById("regPass").value = "";
-}
-
-async function initMarketHTML() {
-    const res = await fetch(`${API_URL}/api/prices`);
-    const assets = await res.json();
-    const marketDiv = document.getElementById("marketList");
-    const tradeSelect = document.getElementById("tradeAsset");
-    const admSelect = document.getElementById("admAsset");
-    
-    marketDiv.innerHTML = ""; tradeSelect.innerHTML = ""; admSelect.innerHTML = "";
-    
-    assets.forEach(a => {
-        selectedTimeframes[a.symbol] = "5m"; 
-        
-        marketDiv.innerHTML += `
-            <div class="asset-box">
-                <div class="asset-header" onclick="toggleDesc('${a.symbol}')">
-                    <span class="symbol">${a.symbol} <small style="font-weight:normal;color:#617360;">— ${a.name}</small></span>
-                    <span class="price" id="price-${a.symbol}">${a.price.toFixed(2)} zł</span>
-                </div>
-                <div class="desc" id="desc-${a.symbol}">${a.desc}</div>
-                <div style="margin-top:5px;">
-                    <button id="btn-${a.symbol}-5m" class="tf-btn btn-${a.symbol} active" onclick="changeTimeframe('${a.symbol}', '5m')">5 MIN</button>
-                    <button id="btn-${a.symbol}-1h" class="tf-btn btn-${a.symbol}" onclick="changeTimeframe('${a.symbol}', '1h')">1 GODZ</button>
-                    <button id="btn-${a.symbol}-1d" class="tf-btn btn-${a.symbol}" onclick="changeTimeframe('${a.symbol}', '1d')">1 DZIEŃ</button>
-                </div>
-                <div class="canvas-container">
-                    <canvas id="canvas-${a.symbol}"></canvas>
-                </div>
-            </div>`;
-            
-        tradeSelect.innerHTML += `<option value="${a.symbol}">${a.symbol}</option>`;
-        admSelect.innerHTML += `<option value="${a.symbol}">${a.symbol}</option>`;
-    });
-}
-
-async function drawCandles(symbol) {
-    const canvas = document.getElementById(`canvas-${symbol}`);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    const tf = selectedTimeframes[symbol] || "5m";
-    const res = await fetch(`${API_URL}/api/candles/${symbol}/${tf}`);
-    const candleData = await res.json();
-    if (!candleData || candleData.length === 0) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const fullW = rect.width;
-    const fullH = rect.height;
-    
-    const paddingRight = 50; 
-    const paddingBottom = 22;
-    const chartW = fullW - paddingRight;
-    const chartH = fullH - paddingBottom;
-
-    ctx.clearRect(0, 0, fullW, fullH);
-
-    let minP = Infinity, maxP = -Infinity;
-    candleData.forEach(c => {
-        if(c[3] < minP) minP = c[3];
-        if(c[2] > maxP) maxP = c[2];
-    });
-    
-    let priceDiff = maxP - minP;
-    minP -= priceDiff * 0.15 || 0.5;
-    maxP += priceDiff * 0.15 || 0.5;
-
-    const count = candleData.length;
-    const spacing = chartW / count;
-    const candleWidth = spacing * 0.65;
-
-    function getX(index) { return index * spacing + spacing / 2; }
-    function getY(price) { return chartH - ((price - minP) / (maxP - minP)) * chartH; }
-
-    ctx.lineWidth = 1;
-    ctx.font = "10px monospace";
-    
-    const gridLines = 4;
-    for (let i = 0; i <= gridLines; i++) {
-        let ratio = i / gridLines;
-        let yPos = chartH * ratio;
-        let priceAtLine = maxP - (ratio * (maxP - minP));
-
-        ctx.strokeStyle = "#162015";
-        ctx.beginPath(); ctx.moveTo(0, yPos); ctx.lineTo(chartW, yPos); ctx.stroke();
-
-        ctx.fillStyle = "#f39c12";
-        ctx.fillText(priceAtLine.toFixed(2) + "zł", chartW + 5, yPos + 3);
-    }
-
-    ctx.strokeStyle = "#444";
-    ctx.beginPath(); ctx.moveTo(0, chartH); ctx.lineTo(chartW, chartH); ctx.stroke();
-    
-    candleData.forEach((c, idx) => {
-        const [t, open, high, low, close] = c;
-        const x = getX(idx);
-        const yOpen = getY(open);
-        const yClose = getY(close);
-        const yHigh = getY(high);
-        const yLow = getY(low);
-
-        const isUp = close >= open;
-        const themeColor = isUp ? "#26a69a" : "#ef5350";
-        ctx.strokeStyle = themeColor;
-        ctx.fillStyle = themeColor;
-
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(x, yHigh); ctx.lineTo(x, yLow); ctx.stroke();
-
-        const bH = Math.abs(yClose - yOpen) || 1.5;
-        const bY = Math.min(yOpen, yClose);
-        ctx.fillRect(x - candleWidth / 2, bY, candleWidth, bH);
-
-        if (idx % 4 === 0) {
-            ctx.fillStyle = "#888";
-            ctx.fillText("T-" + t, x - 12, chartH + 15);
+                currentUser = d.username;
+                if(currentUser.toLowerCase() === "admin") document.getElementById("adminPanel").style.display = "block";
+                
+                document.getElementById("loginPage").style.display = "none";
+                document.getElementById("gamePage").style.display = "block";
+                document.getElementById("displayUser").innerText = currentUser;
+                
+                await updateGameData();
+                setInterval(updateGameData, 1000); // Odświeżanie interfejsu (ceny + portfolio) co 1 sekundę
+                setInterval(loadChat, 2000); // Odświeżanie czatu co 2 sekundy
+            } catch(e) { alert("Błąd połączenia z radiostacją backendu."); }
         }
-    });
-}
 
-async function updateGameData() {
-    if(!currentUser) return;
-    
-    const resPrices = await fetch(`${API_URL}/api/prices`);
-    const assets = await resPrices.json();
-    
-    assets.forEach(a => {
-        const lbl = document.getElementById(`price-${a.symbol}`);
-        if(lbl) lbl.innerText = `${a.price.toFixed(2)} zł`;
-        drawCandles(a.symbol); 
-    });
+        async function updateGameData() {
+            if(!currentUser) return;
+            try {
+                const resG = await fetch(`${API_URL}/api/game-data`);
+                const dataG = await resG.json();
+                localAssets = dataG.assets;
+                document.getElementById("displayDay").innerText = dataG.current_day;
+                
+                const resP = await fetch(`${API_URL}/api/player/${currentUser}`);
+                const dataP = await resP.json();
+                document.getElementById("displayBalance").innerText = dataP.balance.toFixed(2);
+                playerPortfolio = dataP.portfolio;
 
-    const resPlayer = await fetch(`${API_URL}/api/player/${currentUser}/${currentPass}`);
-    const pData = await resPlayer.json();
-    document.getElementById("displayBalance").innerText = pData.balance.toFixed(2);
-    document.getElementById("displayDay").innerText = pData.current_day;
-    
-    const portDiv = document.getElementById("portfolioList"); portDiv.innerHTML = "";
-    let hasAsset = false;
-    Object.keys(pData.portfolio).forEach(sym => {
-        pData.portfolio[sym].forEach(pos => {
-            if(pos.amount > 0) {
-                hasAsset = true;
-                portDiv.innerHTML += `💼 <b>${sym}</b>: ${pos.amount.toFixed(1)} szt. | Próg wejścia: ${pos.buy_price.toFixed(2)} zł | Dźwignia: <b>${pos.leverage}x</b><br>`;
+                renderAssets();
+                renderPortfolio();
+                renderNews(dataG.news);
+            } catch(e) { console.error(e); }
+        }
+
+        function renderAssets() {
+            const cont = document.getElementById("assetsContainer");
+            if(cont.children.length === 0) {
+                for(let sym in localAssets) {
+                    cont.innerHTML += `
+                        <div class="asset-box">
+                            <div class="asset-header">
+                                <span class="symbol">${sym} - ${localAssets[sym].name}</span>
+                                <span class="price" id="p-${sym}">${localAssets[sym].price.toFixed(2)} zł</span>
+                            </div>
+                            <div class="canvas-container">
+                                <canvas id="chart-${sym}"></canvas>
+                            </div>
+                            <div class="flex-row" style="margin-top: 6px;">
+                                <input type="number" id="amt-${sym}" placeholder="Ilość sztuk" min="1" value="5" style="width:65%;">
+                                <button class="btn-buy" onclick="buyAsset('${sym}')">ZAKUP (BUY)</button>
+                            </div>
+                        </div>
+                    `;
+                }
             }
-        });
-    });
-    if(!hasAsset) portDiv.innerHTML = "Brak aktywnych ekspozycji rynkowych.";
+            for(let sym in localAssets) {
+                document.getElementById(`p-${sym}`).innerText = localAssets[sym].price.toFixed(2) + " zł";
+                drawChart(sym, localAssets[sym].history);
+            }
+        }
 
-    const resRank = await fetch(`${API_URL}/api/ranking`);
-    const rData = await resRank.json();
-    const rankDiv = document.getElementById("rankingList"); rankDiv.innerHTML = "";
-    rData.forEach((p, idx) => { rankDiv.innerHTML += `${idx+1}. <b>${p.name}</b>: ${p.balance.toFixed(2)} zł<br>`; });
-}
+        function renderPortfolio() {
+            const tbody = document.getElementById("portfolioEntries");
+            if(playerPortfolio.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#666;">Brak aktywnych pozycji inwestycyjnych.</td></tr>`;
+                return;
+            }
+            let html = "";
+            playerPortfolio.forEach(pos => {
+                const livePrice = localAssets[pos.symbol] ? localAssets[pos.symbol].price : pos.buy_price;
+                const valueNow = pos.amount * livePrice;
+                const costBasis = pos.amount * pos.buy_price;
+                const profitZl = valueNow - costBasis;
+                const profitPct = (profitZl / costBasis) * 100;
+                const color = profitZl >= 0 ? "pos-profit" : "pos-loss";
+                const sign = profitZl >= 0 ? "+" : "";
 
-async function loadArticles() {
-    const res = await fetch(`${API_URL}/api/articles`);
-    const data = await res.json();
-    const box = document.getElementById("newsBox");
-    box.innerHTML = "";
-    
-    const articlesCopy = [...data];
-    articlesCopy.reverse().forEach(a => {
-        box.innerHTML += `
-            <div class="news-article">
-                <div class="news-title">📰 ${a.title}</div>
-                <div class="news-content">${a.content}</div>
-            </div>`;
-    });
-}
+                html += `
+                    <tr>
+                        <td style="font-weight:bold; color:var(--khaki);">${pos.symbol}</td>
+                        <td>${pos.amount}</td>
+                        <td>${pos.buy_price.toFixed(2)} zł</td>
+                        <td style="color:var(--gold); font-weight:bold;">${valueNow.toFixed(2)} zł</td>
+                        <td class="${color}">${sign}${profitZl.toFixed(2)} zł (${sign}${profitPct.toFixed(1)}%)</td>
+                        <td><button class="btn-sell-pos" onclick="sellPosition(${pos.id})">SPRZEDAJ</button></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
 
-async function adminPublishArticle() {
-    const t = document.getElementById("artTitle").value.trim();
-    const c = document.getElementById("artContent").value.trim();
-    if(!t || !c) return alert("Wpisz tytuł i treść artykułu!");
-    
-    await fetch(`${API_URL}/api/admin/article`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ title: t, content: c })
-    });
-    document.getElementById("artTitle").value = "";
-    document.getElementById("artContent").value = "";
-    await loadArticles();
-}
+        function drawChart(sym, history) {
+            const canvas = document.getElementById(`chart-${sym}`);
+            if(!canvas) return;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if(!history || history.length < 2) return;
 
-async function adminExecutePercentChange() {
-    const sym = document.getElementById("admAsset").value;
-    const pct = parseFloat(document.getElementById("admPercent").value);
-    if(isNaN(pct)) return alert("Wpisz poprawną wartość procentową!");
-    
-    const res = await fetch(`${API_URL}/api/admin/change-percent`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ symbol: sym, percent: pct })
-    });
-    const d = await res.json();
-    alert(d.status || d.error);
-    document.getElementById("admPercent").value = "";
-    updateGameData();
-}
+            const max = Math.max(...history) * 1.03;
+            const min = Math.min(...history) * 0.97;
+            const range = max - min;
 
-async function executeTrade(type) {
-    const sym = document.getElementById("tradeAsset").value;
-    const amt = parseFloat(document.getElementById("tradeAmount").value);
-    const lev = parseInt(document.getElementById("tradeLeverage").value);
-    if(!amt || amt <= 0) return alert("Wprowadź prawidłowy wolumen transakcji!");
-    
-    const res = await fetch(`${API_URL}/api/transactions`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username: currentUser, symbol: sym, type: type, amount: amt, leverage: lev })
-    });
-    const d = await res.json(); if(d.error) alert(d.error);
-    updateGameData();
-}
+            ctx.strokeStyle = "#26a69a";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let i = 0; i < history.length; i++) {
+                const x = (i / (history.length - 1)) * canvas.width;
+                const y = canvas.height - ((history[i] - min) / range) * canvas.height;
+                if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
 
-async function loadChat() {
-    const res = await fetch(`${API_URL}/api/messages`); const data = await res.json();
-    const box = document.getElementById("chatBox"); box.innerHTML = "";
-    data.forEach(m => {
-        let tag = m.player === "admin" ? `<span class="badge">DRUH</span>` : `<b>${m.player}</b>`;
-        box.innerHTML += `<div>${tag}: ${m.text}</div>`;
-    });
-    box.scrollTop = box.scrollHeight;
-}
+        async function buyAsset(sym) {
+            const amt = parseFloat(document.getElementById(`amt-${sym}`).value);
+            if(isNaN(amt) || amt <= 0) return alert("Wprowadź prawidłową ilość!");
+            const res = await fetch(`${API_URL}/api/transaction`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ username: currentUser, symbol: sym, type: "BUY", amount: amt })
+            });
+            const d = await res.json(); alert(d.status || d.detail); updateGameData();
+        }
 
-async function sendChatMessage() {
-    const el = document.getElementById("chatText"); const text = el.value.trim(); if(!text) return;
-    await fetch(`${API_URL}/api/messages`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ player: currentUser, text: text })
-    });
-    el.value = ""; loadChat();
-}
+        async function sellPosition(posId) {
+            const res = await fetch(`${API_URL}/api/transaction`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ username: currentUser, symbol: "", type: "SELL_POSITION", amount: posId })
+            });
+            const d = await res.json(); alert(d.status || d.detail); updateGameData();
+        }
 
-async function adminGiveCash() {
-    const t = document.getElementById("admTarget").value.trim();
-    const c = parseFloat(document.getElementById("admCash").value);
-    const res = await fetch(`${API_URL}/api/admin/money`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username: t, amount: c })
-    });
-    const d = await res.json(); alert(d.status || d.error); updateGameData();
-}
+        async function loadChat() {
+            if(!currentUser) return;
+            const res = await fetch(`${API_URL}/api/messages`);
+            const msgs = await res.json();
+            const box = document.getElementById("chatBox");
+            box.innerHTML = "";
+            msgs.forEach(m => {
+                let tag = m.player === "admin" ? `<span class="badge">DRUH</span>` : `<b>${m.player}</b>`;
+                box.innerHTML += `<div>${tag}: ${m.text}</div>`;
+            });
+        }
 
-async function adminNextDay() {
-    const res = await fetch(`${API_URL}/api/admin/next-day`, {method: "POST"});
-    const d = await res.json(); alert(d.status || d.error); updateGameData();
-}
+        async function sendChatMessage() {
+            const el = document.getElementById("chatText"); const text = el.value.trim(); if(!text) return;
+            await fetch(`${API_URL}/api/messages`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ player: currentUser, text: text })
+            });
+            el.value = ""; loadChat();
+        }
 
-async function startCycles() {
-    await initMarketHTML();
-    updateGameData(); loadChat(); loadArticles();
-    setInterval(updateGameData, 4000);
-    setInterval(loadChat, 3000);
-    setInterval(loadArticles, 4000);
-}
-</script>
+        function renderNews(newsArray) {
+            document.getElementById("newsBox").innerHTML = newsArray.map(n => `
+                <div style="margin-bottom:6px;">
+                    <div class="news-title">🔹 ${n.title}</div>
+                    <div style="font-size:12px; color:#ccc;">${n.content}</div>
+                </div>
+            `).join("");
+        }
+
+        async function adminGiveCash() {
+            const t = document.getElementById("admTarget").value.trim();
+            const c = parseFloat(document.getElementById("admCash").value);
+            const res = await fetch(`${API_URL}/api/admin/money`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ username: t, amount: c })
+            });
+            const d = await res.json(); alert(d.status || d.detail); updateGameData();
+        }
+
+        async function adminNextDay() {
+            const res = await fetch(`${API_URL}/api/admin/next-day`, {method: "POST"});
+            const d = await res.json(); alert(d.status || d.error); updateGameData();
+        }
+    </script>
 </body>
 </html>
