@@ -17,25 +17,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- TWOJA TABELA TRENDÓW ---
-trend_map = {
-    "PORT":  [1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1],
-    "MAGI":  [-1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1, 1, 1],
-    "COP":   [1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, -1],
-    "AZOT":  [-1, -1, 1, 1, -1, 1, -1, 1, 1, -1, 1, -1, 1, -1, 1],
-    "STAL":  [1, 1, -1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1],
-    "KOLEJ": [-1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, 1],
-    "AUTO":  [1, -1, 1, -1, 1, 1, -1, -1, 1, -1, 1, -1, 1, 1, -1],
-    "MIEDZ": [-1, 1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1, -1, -1, 1],
-    "SREBRO":[1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1],
-    "ZLOTO": [-1, -1, 1, -1, 1, 1, -1, 1, -1, 1, -1, 1, 1, -1, 1],
-    "USD":   [1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1]
-}
-
 class Transaction(BaseModel):
     username: str
     symbol: str
-    type: str
+    type: str       # "buy_long", "sell_long", "open_short", "close_short"
     amount: float
     leverage: int
 
@@ -63,96 +48,223 @@ class DeletePlayer(BaseModel):
     username: str
 
 market_assets = {
-    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Kompleks portowy zlokalizowany nad Zatoką Gdańską."},
-    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Magistrala kolejowa Herby Nowe – Gdynia."},
-    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "Okręg przemysłu ciężkiego."},
-    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "Państwowa Fabryka Związków Azotowych."},
-    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady Południowe."},
-    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "Ogólnokrajowa infrastruktura."},
-    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "Państwowe Zakłady Inżynierii."},
-    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Kruszec lokacyjny."},
-    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal przemysłowy."},
-    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Kruszec o podwójnym zastosowaniu."},
-    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa."}
+    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Kompleks portowy zlokalizowany nad Zatoką Gdańską. Budowa rozpoczęta na mocy ustawy z dnia 23 września 1922 roku."},
+    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość wynosi dokładnie 452 km."},
+    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "Okręg przemysłu ciężkiego o powierzchni niemal 60 000 kilometrów kwadratowych, zlokalizowany w widłach Wisły i Sanu."},
+    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "Państwowa Fabryka Związków Azotowych w Mościcach pod Tarnowem, wybudowana na obszarze 620 hektarów."},
+    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim."},
+    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "Ogólnokrajowa infrastruktura Polskich Kolei Państwowych (PKP) zarządzająca sieciam ponad 17 000 km linii."},
+    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie."},
+    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Kruszec lokacyjny stanowiący oficjalną bazę rezerw Banku Polskiego. Powiązany z reformą Grabskiego."},
+    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal przemysłowy o wysokiej przewodności, sprowadzany głównie drogą morską ze względu na zapotrzebowanie elektryfikacji."},
+    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Kruszec o podwójnym zastosowaniu rynkowym. Wykorzystywany jako surowiec menniczy przez Mennicę Państwową."},
+    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa i rozliczeniowa Stanów Zjednoczonych Ameryki, oparta na parytecie złota."}
 }
 
 prices = []
 candles_history = {} 
 players = {}  
 messages = []
-articles = [{"title": "Otwarcie Rynku", "content": "System zsynchronizowany z tabelą trendów."}]
+articles = [
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Wprowadzono twarde limity salda oraz automatyczny mechanizm Margin Call chroniący przed debetami."}
+]
 game_state = {"current_day": 1, "player_trend_impulse": {}}
 
 def init_game():
     players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio_long": {}, "portfolio_short": {}}
     players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
+    
     for symbol, data in market_assets.items():
         prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"], "daily_change": 0.0})
         game_state["player_trend_impulse"][symbol] = 0.0
         bp = data["base_price"]
-        candles_history[symbol] = {"5m": [["12:00", bp, bp+0.5, bp-0.5, bp]], "1h": [["12:00", bp, bp+1, bp-1, bp]], "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]}
+        
+        candles_history[symbol] = {
+            "5m": [["12:00", bp, bp+0.5, bp-0.5, bp]],
+            "1h": [["12:00", bp, bp+1, bp-1, bp]],
+            "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]
+        }
 
 init_game()
 
 @app.get("/", response_class=HTMLResponse)
 def get_frontend():
     if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f: return f.read()
-    return "<h1>Status: Backend działa</h1>"
+        with open("index.html", "r", encoding="utf-8") as f: 
+            return f.read()
+    return "<h1>Status: Backend Giełdy II RP działa pomyślnie</h1>"
 
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
-    if cp.username in players: return {"error": "Zajęte"}
+    if cp.username in players: 
+        return {"error": "Ta nazwa jest zajęta!"}
     players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
-    return {"status": "ok"}
+    return {"status": f"Pomyślnie utworzono profil: {cp.username}"}
 
 @app.get("/api/prices")
-def get_prices(): return prices
+def get_prices(): 
+    return prices
 
 @app.get("/api/candles/{symbol}/{timeframe}")
-def get_candles(symbol, timeframe): return candles_history.get(symbol, {}).get(timeframe, [])
+def get_candles(symbol: str, timeframe: str):
+    if symbol in candles_history and timeframe in candles_history[symbol]: 
+        return candles_history[symbol][timeframe]
+    return []
 
 @app.get("/api/player/{username}/{password}")
-def get_player_data(username, password):
-    if username not in players or players[username]["password"] != password: return {"error": "Błąd"}
-    return {"balance": players[username]["balance"], "portfolio_long": players[username].get("portfolio_long", {}), "portfolio_short": players[username].get("portfolio_short", {}), "current_day": game_state["current_day"]}
+def get_player_data(username: str, password: str):
+    if username not in players or players[username]["password"] != password: 
+        return {"error": "Błąd autoryzacji"}
+    return {
+        "balance": players[username]["balance"], 
+        "portfolio_long": players[username].get("portfolio_long", {}), 
+        "portfolio_short": players[username].get("portfolio_short", {}), 
+        "current_day": game_state["current_day"]
+    }
 
 @app.get("/api/admin/players-list")
-def admin_get_players(): return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
+def admin_get_players():
+    return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
 
 @app.post("/api/admin/delete-player")
 def admin_delete_player(dp: DeletePlayer):
-    if dp.username in players and dp.username != "admin": del players[dp.username]
-    return {"status": "ok"}
+    if dp.username == "admin":
+        return {"error": "Nie można usunąć konta głównego administratora!"}
+    if dp.username in players:
+        del players[dp.username]
+        return {"status": f"Pomyślnie usunięto patrol/gracza: {dp.username}"}
+    return {"error": "Nie znaleziono podanego gracza."}
 
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
-    # (Tutaj wklej dokładnie swój stary kod transakcji, nie chciałem go ruszać)
+    if tx.username not in players: 
+        return {"error": "Brak gracza"}
+    player = players[tx.username]
+    
+    if "portfolio_long" not in player: player["portfolio_long"] = {}
+    if "portfolio_short" not in player: player["portfolio_short"] = {}
+
+    idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
+    if idx is None: 
+        return {"error": "Brak aktywa"}
+    
+    asset_price = prices[idx]["price"]
+    market_cap_reference = 500000.0 
+    trade_value = tx.amount * asset_price
+    
+    # ---- 1. KUPNO POZYCJI DŁUGIEJ (LONG) ----
+    if tx.type == "buy_long":
+        margin = trade_value / tx.leverage
+        if player["balance"] < margin: 
+            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
+        player["balance"] -= margin
+        player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
+        player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
+        
+    # ---- 2. ZAMKNIĘCIE POZYCJI DŁUGIEJ (SELL LONG) ----
+    elif tx.type == "sell_long":
+        positions = player["portfolio_long"].get(tx.symbol, [])
+        if sum(pos["amount"] for pos in positions) < tx.amount: 
+            return {"error": "Brak wymaganej liczby jednostek LONG!"}
+        amt_to_rem = tx.amount
+        refund = 0
+        for pos in list(positions):
+            if amt_to_rem <= 0: break
+            if pos["amount"] <= amt_to_rem:
+                profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
+                refund += (pos["margin_allocated"] + profit)
+                amt_to_rem -= pos["amount"]
+                positions.remove(pos)
+            else:
+                fraction = amt_to_rem / pos["amount"]
+                allocated_part = pos["margin_allocated"] * fraction
+                profit = ((asset_price - pos["buy_price"]) * amt_to_rem) * pos["leverage"]
+                refund += (allocated_part + profit)
+                pos["margin_allocated"] -= allocated_part
+                pos["amount"] -= amt_to_rem
+                amt_to_rem = 0
+        player["balance"] += max(refund, 0.0)
+        player["portfolio_long"][tx.symbol] = positions
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+
+    # ---- 3. OTWARCIE POZYCJI KRÓTKIEJ (OPEN SHORT) ----
+    elif tx.type == "open_short":
+        margin = trade_value / tx.leverage
+        if player["balance"] < margin: 
+            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
+        player["balance"] -= margin
+        player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
+        player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+
+    # ---- 4. ZAMKNIĘCIE POZYCJI KRÓTKIEJ (CLOSE SHORT) ----
+    elif tx.type == "close_short":
+        positions = player["portfolio_short"].get(tx.symbol, [])
+        if sum(pos["amount"] for pos in positions) < tx.amount: 
+            return {"error": "Brak wymaganej liczby jednostek SHORT do zamknięcia!"}
+        amt_to_rem = tx.amount
+        refund = 0
+        for pos in list(positions):
+            if amt_to_rem <= 0: break
+            if pos["amount"] <= amt_to_rem:
+                profit = ((pos["entry_price"] - asset_price) * pos["amount"]) * pos["leverage"]
+                refund += (pos["margin_allocated"] + profit)
+                amt_to_rem -= pos["amount"]
+                positions.remove(pos)
+            else:
+                fraction = amt_to_rem / pos["amount"]
+                allocated_part = pos["margin_allocated"] * fraction
+                profit = ((pos["entry_price"] - asset_price) * amt_to_rem) * pos["leverage"]
+                refund += (allocated_part + profit)
+                pos["margin_allocated"] -= allocated_part
+                pos["amount"] -= amt_to_rem
+                amt_to_rem = 0
+        player["balance"] += max(refund, 0.0)
+        player["portfolio_short"][tx.symbol] = positions
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
+        
     return {"status": "ok"}
 
 @app.post("/api/admin/money")
 def admin_add_money(data: AddMoney):
-    if data.username in players: players[data.username]["balance"] += data.amount
-    return {"status": "ok"}
+    if data.username in players:
+        players[data.username]["balance"] += data.amount
+        return {"status": f"Przyznano {data.amount} zł"}
+    return {"error": "Brak gracza"}
 
 @app.post("/api/admin/change-percent")
 def admin_change_percent(data: SetPercentChange):
     idx = next((i for i, p in enumerate(prices) if p["symbol"] == data.symbol), None)
-    if idx is not None: prices[idx]["price"] = round(max(prices[idx]["price"] * (1 + data.percent/100.0), 0.01), 2)
-    return {"status": "ok"}
+    if idx is not None:
+        multiplier = 1 + (data.percent / 100.0)
+        prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 2)
+        return {"status": f"Zmieniono cenę {data.symbol} o {data.percent}%"}
+    return {"error": "Brak aktywa"}
 
 @app.post("/api/admin/article")
 def admin_add_article(art: Article):
     articles.append({"title": art.title, "content": art.content})
-    return {"status": "ok"}
+    return {"status": "Artykuł opublikowany"}
 
 @app.post("/api/admin/next-day")
 def next_day():
-    if game_state["current_day"] < 15: game_state["current_day"] += 1
-    return {"status": "ok"}
+    if game_state["current_day"] < 15:
+        game_state["current_day"] += 1
+        return {"status": f"Dzień {game_state['current_day']}"}
+    return {"error": "Maksymalny dzień osiągnięty"}
 
 @app.get("/api/messages")
-def get_messages(): return messages[-30:]
+def get_messages(): 
+    return messages[-30:]
 
 @app.post("/api/messages")
 def add_message(msg: Message):
@@ -160,38 +272,110 @@ def add_message(msg: Message):
     return {"status": "ok"}
 
 @app.get("/api/articles")
-def get_articles(): return articles
+def get_articles(): 
+    return articles
 
-# --- SILNIK RYNKU Z TABELĄ 50/50 ---
 def market_engine():
     tick_count = 15
     while True:
         time.sleep(4)
         tick_count += 1
-        day_idx = min(game_state["current_day"] - 1, 14)
+        day = game_state["current_day"]
+        
         for p in prices:
             sym = p["symbol"]
             open_p = p["price"]
-            direction = trend_map.get(sym, [1]*15)[day_idx]
+            history_trend = 0.0
             
-            # 50/50 trend + noise
-            change = (0.095 / 15) * direction + random.uniform(-0.001, 0.001)
-            close_p = round(max(open_p * (1 + change), 0.02), 2)
-            p["price"] = close_p
-            p["daily_change"] = round(((close_p - 100.0) / 100.0) * 100, 2)
-            
-            # Logika świec (zachowana Twoja)
-            h, l = max(open_p, close_p) + 0.05, min(open_p, close_p) - 0.05
-            hist = candles_history[sym]["5m"]
-            hist.append([f"12:{tick_count%60:02d}", open_p, h, l, close_p])
-            if len(hist) > 15: candles_history[sym]["5m"] = hist[-15:]
+            if day <= 4:
+                if sym == "USD": history_trend = 0.024
+                if sym in ["COP", "STAL", "AZOT"]: history_trend = -0.005
+                if sym == "PORT": history_trend = 0.006
+            elif day == 5:
+                if sym == "USD": history_trend = -0.06
+                if sym in ["PORT", "KOLEJ"]: history_trend = 0.018
+            elif day == 6:
+                if sym == "USD": history_trend = 0.03
+                if sym == "MIEDZ": history_trend = 0.014
+            elif day in [7, 8, 9]:
+                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.016
+                if sym == "AUTO": history_trend = 0.018
+                if sym == "AZOT": history_trend = 0.014
+                if sym in ["MIEDZ", "SREBRO"]: history_trend = 0.007
+            elif day in [10, 11, 12]:
+                if sym in ["SREBRO", "MIEDZ", "AUTO"]: history_trend = -0.035
+                if sym == "ZLOTO": history_trend = 0.022
+            elif day == 13:
+                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.026
+            elif day == 14:
+                if sym == "ZLOTO": history_trend = 0.035
+                if sym in ["MIEDZ", "AUTO"]: history_trend = 0.01
+            elif day == 15:
+                if sym in ["COP", "STAL"]: history_trend = 0.05
+                if sym in ["MIEDZ", "KOLEJ", "AUTO"]: history_trend = 0.018
 
-        # Margin Call (Twój kod)
-        for u, pl in list(players.items()):
-            for sym, pos_list in pl.get("portfolio_long", {}).items():
-                cur = next((x["price"] for x in prices if x["symbol"] == sym), 1.0)
-                for pos in list(pos_list):
-                    if (pos["buy_price"] - cur) * pos["amount"] * pos["leverage"] >= pos["margin_allocated"]:
-                        pos_list.remove(pos)
+            market_noise = random.uniform(-0.003, 0.003)
+            player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
+            
+            tick_history_change = history_trend / 40.0
+            tick_player_change = player_impulse / 40.0
+            
+            total_tick_change = tick_history_change + tick_player_change + market_noise
+            
+            if total_tick_change > 0.005: total_tick_change = 0.005
+            if total_tick_change < -0.005: total_tick_change = -0.005
+            
+            close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
+            p["price"] = close_p
+            p["daily_change"] = round(((close_p - open_p)/open_p)*100, 2)
+            
+            game_state["player_trend_impulse"][sym] *= 0.95
+            
+            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.002), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.002), 0.01), 2)
+            
+            t_5m = f"12:{(tick_count*5)%60:02d}"
+            t_1h = f"{(12+tick_count)%24:02d}:00"
+            t_1d = f"Dzień {day}"
+
+            for tf, label in [("5m", t_5m), ("1h", t_1h), ("1d", t_1d)]:
+                hist = candles_history[sym][tf]
+                if tick_count % 4 == 0 or len(hist) == 0:
+                    hist.append([label, open_p, high_p, low_p, close_p])
+                else:
+                    last = hist[-1]
+                    last[0] = label
+                    last[2] = max(last[2], high_p)
+                    last[3] = min(last[3], low_p)
+                    last[4] = close_p
+                if len(hist) > 15: candles_history[sym][tf] = hist[-15:]
+
+        # ---- TWARDY MECHANIZM MARGIN CALL (LIKWIDACJA AUTOMATYCZNA) ----
+        for username, player in list(players.items()):
+            if username == "admin": continue
+            
+            # Sprawdzanie i czyszczenie pozycji LONG
+            for sym, positions in list(player.get("portfolio_long", {}).items()):
+                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                if current_price is None: continue
+                
+                for pos in list(positions):
+                    # Strata na LONG: (cena zakupu - cena obecna) * ilość * dźwignia
+                    loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
+                    if loss >= pos["margin_allocated"]:
+                        positions.remove(pos)
+                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
+            
+            # Sprawdzanie i czyszczenie pozycji SHORT
+            for sym, positions in list(player.get("portfolio_short", {}).items()):
+                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                if current_price is None: continue
+                
+                for pos in list(positions):
+                    # Strata na SHORT: (cena obecna - cena wejścia) * ilość * dźwignia
+                    loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
+                    if loss >= pos["margin_allocated"]:
+                        positions.remove(pos)
+                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
 
 threading.Thread(target=market_engine, daemon=True).start()
