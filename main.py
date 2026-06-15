@@ -44,62 +44,21 @@ class SetPercentChange(BaseModel):
     symbol: str
     percent: float
 
+class DeletePlayer(BaseModel):
+    username: str
+
 market_assets = {
-    "PORT": {
-        "name": "Port w Gdyni", 
-        "base_price": 100.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kompleks portowy zlokalizowany nad Zatoką Gdańską. Budowa rozpoczęta na mocy ustawy z dnia 23 września 1922 roku. Infrastruktura obejmuje tzw. Port Tymczasowy (wzniesiony kosztem około 25 milionów marek polskich), a docelowy projekt przewiduje baseny o głębokości do 10 metrów, nabrzeża przeładunkowe (m.in. Indyjskie, Rotterdamskie), falochron osłonowy o długości ponad 2 kilometrów oraz nowoczesną łuszczarnię ryżu i chłodnię składową. Roczne zdolności przeładunkowe w pierwszym etapie oszacowano na 2,5 miliona ton towarów, głównie węgla kamiennego i drewna."
-    },
-    "MAGI": {
-        "name": "Magistrala Śląsk-Gdynia", 
-        "base_price": 80.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość trasy wynosi dokładnie 452 kilometry. Państwowy projekt budowlany mający na celu bezpośrednie ominięcie terytorium Wolnego Miasta Gdańska. Prowadzi ruch towarowy przez stacje węzłowe Zduńska Wola Karsznice oraz Inowrocław. Koszt położenia jednego kilometra torowiska w trudnym terenie kaszubskim wyniósł średnio 220 000 złotych. Trasa jest w pełni przystosowana do obsługi ciężkich składów węglowych o masie brutto do 1800 ton, ciągniętych przez parowozy serii Ty23."
-    },
-    "COP": {
-        "name": "Centralny Okręg Przemysłowy", 
-        "base_price": 150.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Okręg przemysłu ciężkiego o powierzchni niemal 60 000 kilometrów kwadratowych, zlokalizowany w widłach Wisły i Sanu, obejmujący powiaty województw kieleckiego, lubelskiego, krakowskiego i lwowskiego. Całkowity budżet inwestycyjny rozpisany przez Departament Budżetowy Ministerstwa Skarbu wynosi 1 miliard złotych. Struktura podzielona jest na trzy regiony: surowcowy (kielecki), wytwórczy (sandomierski) oraz konsumpcyjny (lubelski). W skład zasobów wchodzą m.in. elektrownia wodna w Rożnowie oraz liczne zakłady przetwórstwa metali."
-    },
-    "AZOT": {
-        "name": "Zakłady Azotowe Tarnów", 
-        "base_price": 60.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowa Fabryka Związków Azotowych w Mościcach pod Tarnowem, wybudowana na obszarze 620 hektarów zakupionym od rodziny Sanguszków. Koszt całej inwestycji infrastrukturalnej zamknął się w kwocie 64 milionów złotych rządu II RP. Kompleks posiada własną elektrociepłownię o mocy 30 MW, rozbudowany węzeł gazowy oraz instalacje do syntezy amoniaku według metody Fausera. Nominalna zdolność produkcyjna zakładu wynosi około 60 000 ton saletrzaku, siarczanu amonu oraz kwasu azotowego rocznie, przeznaczonych na rynek wewnętrzny."
-    },
-    "STAL": {
-        "name": "Stalowa Wola", 
-        "base_price": 100.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim. Powierzchnia hal fabrycznych i hutniczych wynosi 120 hektarów. Inwestycja finansowana jest z kredytów Funduszu Obrony Narodowej. Park maszynowy składa się z nowoczesnych tokarek importowanych z Francji oraz własnego wydziału metalurgicznego wyposażonego w piece martenowskie o pojemności 50 ton. Profil produkcyjny obejmuje odlewy staliwne, lufy artyleryjskie, blachy pancerne oraz płyty walcowane na zimno."
-    },
-    "KOLEJ": {
-        "name": "Spółki Kolejowe i Transportowe", 
-        "base_price": 120.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Ogólnokrajowa infrastruktura Polskich Kolei Państwowych (PKP) zarządzająca sieciam ponad 17 000 kilometrów linii normalnotorowych. Tabor państwowy składa się z 5100 parowozów, 11 500 wagonów pasażerskich oraz około 150 000 wagonów towarowych (głównie węglarek i platform). Główny węzeł rozrządowy zlokalizowany jest w Warszawie (stacja Warszawa Główna). Oficjalna taryfa przewozowa za tonokilometr ładunku masowego wynosi średnio 0,04 złotego, a roczny wolumen przewozów towarowych oscyluje w granicach 60 milionów ton."
-    },
-    "AUTO": {
-        "name": "Państwowe Zakłady Inżynierii", 
-        "base_price": 70.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie, skupiające m.in. Fabrykę Samochodów Osobowych i Półciężarowych oraz Fabrykę Silników i Armatury w Ursusie. Zakłady posiadają wyłączne licencje na produkcję pojazdów ciężarowych i podwozi marki Fiat (modele 621 i 508), motocykli Sokół 1000 i 600 oraz ciągników gąsienicowych C7P. Zatrudnienie przekracza 6000 robotników i inżynierów. Moce montażowe linii produkcyjnej wynoszą do 3500 podwozi kołowych w skali roku."
-    },
-    "ZLOTO": {
-        "name": "Złoto", 
-        "base_price": 45.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kruszec lokacyjny stanowiący oficjalną bazę rezerw Banku Polskiego. Jeden kilogram czystego złota o próbie 900 odpowiada parytetowi określonemu w statucie banku. Zgodnie z reformą Władysława Grabskiego z kwietnia 1924 roku, parytet polskiego złotego został powiązany bezpośrednio z wartością 0,168792 grama czystego kruszcu. Zasoby fizyczne Banku Polskiego przechowywane są w skarbcach w Warszawie, a część rezerw zdeponowana jest w bankach centralnych we Francji, Wielkiej Brytanii oraz w Federal Reserve Bank w Nowym Jorku."
-    },
-    "MIEDZ": {
-        "name": "Miedź", 
-        "base_price": 20.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Metal przemysłowy o wysokiej przewodności, sprowadzany głównie drogą morską z kopalń w Chile oraz drogą kolejową z Katangi. Standardowa giełdowa jednostka rozliczeniowa to 1 tona katod miedziowych na giełdzie w Londynie (LME). W kraju surowiec przetwarzany jest przez walcownie Dziedzice oraz zakłady w Szopienicach. Cena rynkowa ustalana jest w oparciu o cenniki międzynarodowe przeliczane na złote dewizowe. Średnie zużycie krajowe na cele elektryfikacyjne wynosi około 12 000 ton rocznie."
-    },
-    "SREBRO": {
-        "name": "Srebro", 
-        "base_price": 25.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kruszec o podwójnym zastosowaniu rynkowym. Wykorzystywany jako surowiec menniczy przez Mennicę Państwową w Warszawie do bicia monet obiegowych (o nominałach 2, 5 i 10 złotych z wizerunkiem Polonii lub Józefa Piłsudskiego, o próbie srebra 750). Skup i rozliczenia realizowane są w uncjach trojańskich. Krajowe zapasy pochodzą częściowo z odzysku metalurgicznego na Górnym Śląsku oraz z importu surowego srebra rafinowanego z rafinerii w Hamburgu i Londynie."
-    },
-    "USD": {
-        "name": "Dolar Amerykański", 
-        "base_price": 5.20, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Główna waluta rezerwowa i rozliczeniowa Stanów Zjednoczonych Ameryki, oparta na parytecie złota (zgodnie z ustawą Gold Standard Act). Przed reformą Grabskiego kurs dolara na wolnym rynku w Warszawie osiągał miliony marek polskich. Po wprowadzeniu złotego oficjalny kurs parytetowy ustalono na poziomie 5,18 złotego za 1 dolara amerykańskiego. Waluta ta służy w II RP do zabezpieczania transakcji zagranicznych oraz jako prywatny środek tezauryzacji (gromadzenia kapitału) przez obywateli."
-    }
+    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Kompleks portowy zlokalizowany nad Zatoką Gdańską. Budowa rozpoczęta na mocy ustawy z dnia 23 września 1922 roku."},
+    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość wynosi dokładnie 452 km."},
+    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "Okręg przemysłu ciężkiego o powierzchni niemal 60 000 kilometrów kwadratowych, zlokalizowany w widłach Wisły i Sanu."},
+    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "Państwowa Fabryka Związków Azotowych w Mościcach pod Tarnowem, wybudowana na obszarze 620 hektarów."},
+    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim."},
+    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "Ogólnokrajowa infrastruktura Polskich Kolei Państwowych (PKP) zarządzająca sieciam ponad 17 000 km linii."},
+    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie."},
+    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Kruszec lokacyjny stanowiący oficjalną bazę rezerw Banku Polskiego. Powiązany z reformą Grabskiego."},
+    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal przemysłowy o wysokiej przewodności, sprowadzany głównie drogą morską ze względu na zapotrzebowanie elektryfikacji."},
+    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Kruszec o podwójnym zastosowaniu rynkowym. Wykorzystywany jako surowiec menniczy przez Mennicę Państwową."},
+    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa i rozliczeniowa Stanów Zjednoczonych Ameryki, oparta na parytecie złota."}
 }
 
 prices = []
@@ -107,9 +66,9 @@ candles_history = {}
 players = {}  
 messages = []
 articles = [
-    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Rozpoczynamy symulację handlową opartą o uwarunkowania geopolityczne i gospodarcze państwa."}
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Rozpoczynamy bezpieczną symulację handlową."}
 ]
-game_state = {"current_day": 1, "player_impact": {}}
+game_state = {"current_day": 1, "player_trend_impulse": {}}
 
 def init_game():
     players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio": {}}
@@ -117,7 +76,7 @@ def init_game():
     
     for symbol, data in market_assets.items():
         prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"], "daily_change": 0.0})
-        game_state["player_impact"][symbol] = 1.0
+        game_state["player_trend_impulse"][symbol] = 0.0
         bp = data["base_price"]
         
         candles_history[symbol] = {
@@ -127,9 +86,9 @@ def init_game():
         }
         for i in range(1, 15):
             t_5m = f"12:{i*5:02d}" if i*5 < 60 else f"13:{i*5-60:02d}"
-            candles_history[symbol]["5m"].append([t_5m, bp, bp+random.uniform(-1,1), bp+random.uniform(-1,1), bp])
-            candles_history[symbol]["1h"].append([f"{12+i}:00", bp, bp+random.uniform(-2,2), bp+random.uniform(-2,2), bp])
-            candles_history[symbol]["1d"].append([f"Dzień {i}", bp, bp+random.uniform(-5,5), bp+random.uniform(-5,5), bp])
+            candles_history[symbol]["5m"].append([t_5m, bp, bp+random.uniform(-0.5,0.5), bp+random.uniform(-0.5,0.5), bp])
+            candles_history[symbol]["1h"].append([f"{12+i}:00", bp, bp+random.uniform(-1,1), bp+random.uniform(-1,1), bp])
+            candles_history[symbol]["1d"].append([f"Dzień {i}", bp, bp+random.uniform(-2,2), bp+random.uniform(-2,2), bp])
 
 init_game()
 
@@ -172,6 +131,20 @@ def get_ranking():
     ranking_list = [{"name": u, "balance": d["balance"]} for u, d in players.items() if u != "admin"]
     return sorted(ranking_list, key=lambda x: x["balance"], reverse=True)
 
+@app.get("/api/admin/players-list")
+def admin_get_players():
+    # Zwraca pełną listę graczy z hasłami i stanem konta (tylko dla admina na froncie)
+    return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
+
+@app.post("/api/admin/delete-player")
+def admin_delete_player(dp: DeletePlayer):
+    if dp.username == "admin":
+        return {"error": "Nie można usunąć konta głównego administratora!"}
+    if dp.username in players:
+        del players[dp.username]
+        return {"status": f"Pomyślnie usunięto patrol/gracza: {dp.username}"}
+    return {"error": "Nie znaleziono podanego gracza."}
+
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
     if tx.username not in players: 
@@ -182,14 +155,19 @@ def process_transaction(tx: Transaction):
         return {"error": "Brak aktywa"}
     
     asset_price = prices[idx]["price"]
+    market_cap_reference = 500000.0 
+    trade_value = tx.amount * asset_price
+    
     if tx.type == "buy":
-        margin = (asset_price * tx.amount) / tx.leverage
+        margin = trade_value / tx.leverage
         if player["balance"] < margin: 
             return {"error": "Brak wolnych środków!"}
         player["balance"] -= margin
         player["portfolio"][tx.symbol] = player["portfolio"].get(tx.symbol, [])
         player["portfolio"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage})
-        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.001), 1.15)
+        
+        impact = (trade_value / market_cap_reference) * 0.20
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.20)
         
     elif tx.type == "sell":
         positions = player["portfolio"].get(tx.symbol, [])
@@ -212,7 +190,10 @@ def process_transaction(tx: Transaction):
                 amt_to_rem = 0
         player["balance"] += max(refund, 0.0)
         player["portfolio"][tx.symbol] = positions
-        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.001), 0.85)
+        
+        impact = (trade_value / market_cap_reference) * 0.20
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.20)
+        
     return {"status": "ok"}
 
 @app.post("/api/admin/money")
@@ -298,19 +279,25 @@ def market_engine():
                 if sym in ["COP", "STAL"]: history_trend = 0.05
                 if sym in ["MIEDZ", "KOLEJ", "AUTO"]: history_trend = 0.018
 
-            market_noise = random.uniform(-0.01, 0.01)
-            total_change = (history_trend * 0.6) + (market_noise * 0.4)
-            total_change += (game_state["player_impact"][sym] - 1.0) * 0.05
+            market_noise = random.uniform(-0.003, 0.003)
+            player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
             
-            if total_change > 0.10: total_change = 0.10
-            if total_change < -0.10: total_change = -0.10
+            tick_history_change = history_trend / 40.0
+            tick_player_change = player_impulse / 40.0
             
-            close_p = round(max(open_p * (1 + total_change), 0.02), 2)
+            total_tick_change = tick_history_change + tick_player_change + market_noise
+            
+            if total_tick_change > 0.005: total_tick_change = 0.005
+            if total_tick_change < -0.005: total_tick_change = -0.005
+            
+            close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
             p["price"] = close_p
-            p["daily_change"] = round(total_change * 100, 2)
+            p["daily_change"] = round(((close_p - open_p)/open_p)*100, 2)
             
-            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.01), 2)
-            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.01), 0.01), 2)
+            game_state["player_trend_impulse"][sym] *= 0.95
+            
+            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.002), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.002), 0.01), 2)
             
             t_5m = f"12:{(tick_count*5)%60:02d}"
             t_1h = f"{(12+tick_count)%24:02d}:00"
