@@ -31,9 +31,12 @@
         .asset-row:hover, .asset-row.active { background: #1c241c; }
         .price-up { color: var(--green); font-weight: bold; text-align: right; }
         .price-down { color: var(--red); font-weight: bold; text-align: right; }
-        #chart-container { width: 100%; height: 380px; background: #0e110e; border-radius: 6px; border: 1px solid #1f291f; position: relative; margin-bottom: 25px; }
+        
+        /* Kontener wykresu z marginesem na osie */
+        #chart-container { width: 100%; height: 380px; background: #0e110e; border-radius: 6px; border: 1px solid #1f291f; position: relative; margin-bottom: 25px; cursor: crosshair; overflow: hidden; }
+        
         .badge { background: #443c28; color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #665734; }
-        .portfolio-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px dashed #1f291f; }
+        .portfolio-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px dashed #1f291f; }
         .news-item { padding: 8px 0; border-bottom: 1px solid #1f291f; }
         .news-title { font-weight: bold; color: var(--khaki); font-size: 14px; }
         .news-content { font-size: 12px; color: #b2beb2; margin-top: 2px; }
@@ -41,7 +44,17 @@
         #chat-box div { margin-bottom: 5px; line-height: 1.4; }
         .flex-tabs { display: flex; gap: 5px; margin-bottom: 10px; }
         .flex-tabs button { padding: 6px; font-size: 12px; }
-        .chart-timeline-label { position: absolute; bottom: -20px; font-size: 10px; color: #667766; transform: translateX(-50%); white-space: nowrap; }
+        
+        /* Oś czasu i ceny */
+        .chart-timeline-label { position: absolute; bottom: 2px; font-size: 10px; color: #667766; transform: translateX(-50%); white-space: nowrap; pointer-events: none; }
+        .chart-price-label { position: absolute; right: 2px; font-size: 10px; color: #667766; transform: translateY(-50%); pointer-events: none; font-weight: bold; }
+        
+        /* Linie celownika i tooltip */
+        .chart-line-v { position: absolute; top: 0; bottom: 25px; width: 1px; border-left: 1px dashed rgba(156, 177, 128, 0.4); pointer-events: none; display: none; }
+        .chart-line-h { position: absolute; left: 0; right: 65px; height: 1px; border-top: 1px dashed rgba(156, 177, 128, 0.4); pointer-events: none; display: none; }
+        #chart-tooltip { position: absolute; top: 5px; left: 5px; background: rgba(19, 24, 19, 0.9); border: 1px solid var(--khaki); padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 10; pointer-events: none; display: none; line-height: 1.3; font-family: monospace; }
+        .axis-tracker-y { position: absolute; right: 2px; background: var(--khaki); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; transform: translateY(-50%); font-weight: bold; display: none; pointer-events: none; z-index: 5; }
+        .axis-tracker-x { position: absolute; bottom: 2px; background: var(--khaki); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; transform: translateX(-50%); font-weight: bold; display: none; pointer-events: none; z-index: 5; }
     </style>
 </head>
 <body>
@@ -85,7 +98,16 @@
                             <button onclick="setTimeframe('1d')">1D</button>
                         </div>
                     </div>
-                    <div id="chart-container"></div>
+                    
+                    <div id="chart-container" onmousemove="handleChartHover(event)" onmouseleave="handleChartLeave()" onclick="handleChartHover(event)">
+                        <div id="chart-line-v" class="chart-line-v"></div>
+                        <div id="chart-line-h" class="chart-line-h"></div>
+                        <div id="axis-tracker-y" class="axis-tracker-y"></div>
+                        <div id="axis-tracker-x" class="axis-tracker-x"></div>
+                        <div id="chart-tooltip"></div>
+                        <div id="chart-drawing-area" style="position:absolute; top:0; left:0; right:65px; bottom:25px;"></div>
+                    </div>
+                    
                     <p id="asset-desc" style="font-size:11.5px; color:#a2b0a2; margin:8px 0 0 0; line-height:1.4; font-style:italic; text-align:justify; background:#0e110e; padding:8px; border-radius:4px; border:1px solid #1a221a;"></p>
                 </div>
 
@@ -174,6 +196,9 @@
         let selectedAsset = "";
         let currentTimeframe = "5m";
         let localPrices = [];
+        let activeCandles = []; // Przechowuje aktualnie wyswietlane swieczki dla kalkulatora osi
+        let globalChartMin = 0;
+        let globalChartMax = 0;
 
         async function login() {
             const u = document.getElementById("username").value.trim();
@@ -193,7 +218,6 @@
             initApp();
         }
 
-        // Rejestracja wywoływana tylko przez Admina z poziomu panelu
         async function adminRegisterPatrol() {
             const u = document.getElementById("regUser").value.trim();
             const p = document.getElementById("regPass").value.trim();
@@ -248,7 +272,6 @@
             container.innerHTML = "";
             localPrices.forEach(a => {
                 const act = a.symbol === selectedAsset ? "active" : "";
-                // Renderowanie procentowej zmiany ceny spólek
                 const chg = a.daily_change || 0;
                 const chgClass = chg >= 0 ? "price-up" : "price-down";
                 const chgSign = chg >= 0 ? "+" : "";
@@ -283,17 +306,40 @@
             if(!selectedAsset) return;
             const res = await fetch(`${API_URL}/api/candles/${selectedAsset}/${currentTimeframe}`);
             const candles = await res.json();
-            const container = document.getElementById("chart-container");
+            activeCandles = candles;
+            
+            const container = document.getElementById("chart-drawing-area");
+            const fullContainer = document.getElementById("chart-container");
+            
+            // Czyszczenie poprzednich świeczek i osi ceny
             container.innerHTML = "";
+            fullContainer.querySelectorAll('.chart-price-label, .chart-timeline-label').forEach(el => el.remove());
+            
             if(!candles || candles.length === 0) return;
 
-            let prices = candles.map(c => [c[1], c[2], c[3], c[4]]).flat();
-            let minP = Math.min(...prices); let maxP = Math.max(...prices);
+            let pricesList = candles.map(c => [c[1], c[2], c[3], c[4]]).flat();
+            let minP = Math.min(...pricesList); let maxP = Math.max(...pricesList);
             let range = maxP - minP || 1;
             minP -= range * 0.05; maxP += range * 0.05; range = maxP - minP;
+            
+            globalChartMin = minP;
+            globalChartMax = maxP;
 
-            let w = container.clientWidth; let h = container.clientHeight - 20;
+            let w = container.clientWidth; let h = container.clientHeight;
             let numCandles = candles.length; let candleW = (w / numCandles);
+
+            // RENDEROWANIE OSI CENY (PODZIAŁKA PO PRAWEJ STRONIE)
+            let steps = 5;
+            for(let i = 0; i <= steps; i++) {
+                let pVal = minP + (range * (i / steps));
+                let yPos = h - (i / steps) * h;
+                
+                let lblPrice = document.createElement("div");
+                lblPrice.className = "chart-price-label";
+                lblPrice.style.top = `${yPos}px`;
+                lblPrice.innerText = `${pVal.toFixed(2)} zł`;
+                fullContainer.appendChild(lblPrice);
+            }
 
             candles.forEach((c, idx) => {
                 let [label, open, high, low, close] = c;
@@ -324,17 +370,90 @@
                 body.style.width = `${cw}px`; body.style.background = color;
                 container.appendChild(body);
 
-                // Zależność czasu od ceny - etykiety osi czasu co kilka świeczek
+                // Etykiety osi czasu na dole wykresu
                 if(idx % 3 === 0 || idx === numCandles - 1) {
-                    let lbl = document.createElement("div");
-                    lbl.className = "chart-timeline-label";
-                    lbl.style.left = `${x + cw/2}px`;
-                    lbl.innerText = label;
-                    container.appendChild(lbl);
+                    let lblTime = document.createElement("div");
+                    lblTime.className = "chart-timeline-label";
+                    lblTime.style.left = `${x + cw/2}px`;
+                    lblTime.innerText = label;
+                    fullContainer.appendChild(lblTime);
                 }
             });
         }
 
+        // LOGIKA INTERAKTYWNEJ LINIJKI I CURSORA (CROSSHAIR + TOOLTIP)
+        function handleChartHover(e) {
+            if(!activeCandles || activeCandles.length === 0) return;
+            
+            const container = document.getElementById("chart-drawing-area");
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            if(mouseX < 0 || mouseX > rect.width || mouseY < 0 || mouseY > rect.height) {
+                handleChartLeave();
+                return;
+            }
+            
+            // Wyznaczanie najblizszej swieczki
+            const numCandles = activeCandles.length;
+            const candleW = rect.width / numCandles;
+            let candleIdx = Math.floor(mouseX / candleW);
+            if(candleIdx < 0) candleIdx = 0;
+            if(candleIdx >= numCandles) candleIdx = numCandles - 1;
+            
+            const candle = activeCandles[candleIdx];
+            const [label, open, high, low, close] = candle;
+            
+            // Wyznaczanie ceny z pozycji kursora Y
+            const range = globalChartMax - globalChartMin;
+            const hoverPrice = globalChartMax - (mouseY / rect.height) * range;
+            
+            // Wyswietlanie linii celownika
+            const lineV = document.getElementById("chart-line-v");
+            const lineH = document.getElementById("chart-line-h");
+            const trackerY = document.getElementById("axis-tracker-y");
+            const trackerX = document.getElementById("axis-tracker-x");
+            const tooltip = document.getElementById("chart-tooltip");
+            
+            const exactX = (candleIdx * candleW) + (candleW / 2);
+            
+            lineV.style.display = "block";
+            lineV.style.left = `${exactX}px`;
+            
+            lineH.style.display = "block";
+            lineH.style.top = `${mouseY}px`;
+            
+            // Aktualizacja wskaznika ceny na osi Y
+            trackerY.style.display = "block";
+            trackerY.style.top = `${mouseY}px`;
+            trackerY.innerText = `${hoverPrice.toFixed(2)} zł`;
+            
+            // Aktualizacja wskaznika czasu na osi X
+            trackerX.style.display = "block";
+            trackerX.style.left = `${exactX}px`;
+            trackerX.innerText = label;
+            
+            // Budowanie okienka danych historycznych (Tooltip)
+            tooltip.style.display = "block";
+            tooltip.innerHTML = `
+                <div style="color:var(--khaki); font-weight:bold; border-bottom:1px solid #334433; margin-bottom:3px; padding-bottom:2px;">⏱️ ${label}</div>
+                <div>O: <span style="color:#fff">${open.toFixed(2)}</span></div>
+                <div>H: <span style="color:var(--green)">${high.toFixed(2)}</span></div>
+                <div>L: <span style="color:var(--red)">${low.toFixed(2)}</span></div>
+                <div>C: <span style="color:#fff">${close.toFixed(2)}</span></div>
+            `;
+        }
+
+        function handleChartLeave() {
+            document.getElementById("chart-line-v").style.display = "none";
+            document.getElementById("chart-line-h").style.display = "none";
+            document.getElementById("axis-tracker-y").style.display = "none";
+            document.getElementById("axis-tracker-x").style.display = "none";
+            document.getElementById("chart-tooltip").style.display = "none";
+        }
+
+        // DYNAMICZNE WYLICZANIE ZYSKU I STRATY (P&L) W PORTFELU NA ŻYWO
         function renderPortfolio(portfolio) {
             const box = document.getElementById("portfolio-list"); box.innerHTML = "";
             let empty = true;
@@ -342,24 +461,38 @@
                 let positions = portfolio[symbol];
                 if(!positions || positions.length === 0) continue;
                 empty = false;
+                
                 let totalAmt = positions.reduce((sum, p) => sum + p.amount, 0);
                 let avgPrice = positions.reduce((sum, p) => sum + (p.buy_price * p.amount), 0) / totalAmt;
                 let lev = positions[0].leverage;
                 
-                // Dodano przycisk szybkiego zamknięcia całej transakcji [X]
+                // Pobieranie aktualnej ceny spolki z rynku dla kalkulacji P&L
+                const currentAsset = localPrices.find(p => p.symbol === symbol);
+                let currentMarketPrice = currentAsset ? currentAsset.price : avgPrice;
+                
+                // Kalkulacja zysku/straty w gotowce i procentach uwzgledniajaca dźwignię
+                let profitCash = (currentMarketPrice - avgPrice) * totalAmt * lev;
+                let profitPercent = ((currentMarketPrice - avgPrice) / avgPrice) * 100 * lev;
+                
+                let pnlClass = profitCash >= 0 ? "price-up" : "price-down";
+                let pnlSign = profitCash >= 0 ? "+" : "";
+                
                 box.innerHTML += `
                     <div class="portfolio-item">
                         <div>
                             <b>${symbol}</b> (${totalAmt} szt.)
-                            <div style="font-size:11px; color:#889988;">Śr.: ${avgPrice.toFixed(2)} (x${lev})</div>
+                            <div style="font-size:11px; color:#889988;">Śr. kupno: ${avgPrice.toFixed(2)} (x${lev})</div>
                         </div>
-                        <button class="btn-red" style="width:auto; padding:4px 8px; font-size:11px; margin:0;" onclick="quickClosePosition('${symbol}', ${totalAmt})">[X] Zamknij</button>
+                        <div style="text-align:right; margin-right:10px;">
+                            <div class="${pnlClass}" style="font-size:13px;">${pnlSign}${profitCash.toFixed(2)} zł</div>
+                            <div class="${pnlClass}" style="font-size:11px; font-weight:normal;">${pnlSign}${profitPercent.toFixed(1)}%</div>
+                        </div>
+                        <button class="btn-red" style="width:auto; padding:5px 10px; font-size:11px; margin:0;" onclick="quickClosePosition('${symbol}', ${totalAmt})">[X] Zamknij</button>
                     </div>`;
             }
             if(empty) box.innerHTML = `<p style="font-size:12px;color:#667766;text-align:center;margin:15px 0;">Brak otwartych pozycji rynkowych.</p>`;
         }
 
-        // Funkcja szybkiego zamykania
         function quickClosePosition(symbol, amount) {
             selectAsset(symbol);
             document.getElementById("sell-amount").value = amount;
@@ -374,7 +507,6 @@
             });
         }
 
-        // Publikowanie na tablicy ogłoszeń przez admina za pomocą depeszy radiowych
         async function adminPostAnnouncement() {
             const text = document.getElementById("admAnnounce").value.trim();
             if(!text) return alert("Wpisz ogłoszenie!");

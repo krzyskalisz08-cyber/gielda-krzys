@@ -53,7 +53,7 @@ market_assets = {
     "MAGI": {
         "name": "Magistrala Śląsk-Gdynia", 
         "base_price": 80.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość trasy wynosi dokładnie 452 kilometry. Państwowy projekt budowlany mający na celu bezpośrednie ominięcie terytorium Wolnego Miasta Gdańska. Prowadzi ruch towarowy przez stacje węzłowe Zduńska Wola Karsznice oraz Inowrocław. Koszt położenia jednego kilometra torowiska w trudnym terenie kaszubskim wyniósł średnio 220 000 złotych. Trasa jest w pełni przystosowana to obsługi ciężkich składów węglowych o masie brutto do 1800 ton, ciągniętych przez parowozy serii Ty23."
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość trasy wynosi dokładnie 452 kilometry. Państwowy projekt budowlany mający na celu bezpośrednie ominięcie terytorium Wolnego Miasta Gdańska. Prowadzi ruch towarowy przez stacje węzłowe Zduńska Wola Karsznice oraz Inowrocław. Koszt położenia jednego kilometra torowiska w trudnym terenie kaszubskim wyniósł średnio 220 000 złotych. Trasa jest w pełni przystosowana do obsługi ciężkich składów węglowych o masie brutto do 1800 ton, ciągniętych przez parowozy serii Ty23."
     },
     "COP": {
         "name": "Centralny Okręg Przemysłowy", 
@@ -68,7 +68,7 @@ market_assets = {
     "STAL": {
         "name": "Stalowa Wola", 
         "base_price": 100.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim. Powierzchnia hal fabrycznych i hutniczych wynosi 120 hektarów. Inwestycja finansowana jest z kredytów Funduszu Obrony Narodowej. Park maszynowy składa się z nowoczesnych tokarek importowanych z Francji oraz własnego wydziału metalurgicznego wyposażonego w piece martenowskie o pojemności 50 ton. Profil produkcyjny obejmuje odlewy staliwne, lufy artylejryjskie, blachy pancerne oraz płyty walcowane na zimno."
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim. Powierzchnia hal fabrycznych i hutniczych wynosi 120 hektarów. Inwestycja finansowana jest z kredytów Funduszu Obrony Narodowej. Park maszynowy składa się z nowoczesnych tokarek importowanych z Francji oraz własnego wydziału metalurgicznego wyposażonego w piece martenowskie o pojemności 50 ton. Profil produkcyjny obejmuje odlewy staliwne, lufy artyleryjskie, blachy pancerne oraz płyty walcowane na zimno."
     },
     "KOLEJ": {
         "name": "Spółki Kolejowe i Transportowe", 
@@ -116,18 +116,15 @@ def init_game():
     players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio": {}}
     
     for symbol, data in market_assets.items():
-        # Dodane pole daily_change do śledzenia procentów
         prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"], "daily_change": 0.0})
         game_state["player_impact"][symbol] = 1.0
         bp = data["base_price"]
         
-        # Inicjalizacja świeczek ze znacznikami czasu w formacie string
         candles_history[symbol] = {
             "5m": [["12:00", bp, bp+0.5, bp-0.5, bp]],
             "1h": [["12:00", bp, bp+1, bp-1, bp]],
             "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]
         }
-        # Wygenerowanie przykładowej historii wstecznej
         for i in range(1, 15):
             t_5m = f"12:{i*5:02d}" if i*5 < 60 else f"13:{i*5-60:02d}"
             candles_history[symbol]["5m"].append([t_5m, bp, bp+random.uniform(-1,1), bp+random.uniform(-1,1), bp])
@@ -310,13 +307,11 @@ def market_engine():
             
             close_p = round(max(open_p * (1 + total_change), 0.02), 2)
             p["price"] = close_p
-            # Wyliczenie procentowej zmiany dla front-endu
             p["daily_change"] = round(total_change * 100, 2)
             
             high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.01), 2)
             low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.01), 0.01), 2)
             
-            # Znaczniki osi czasu
             t_5m = f"12:{(tick_count*5)%60:02d}"
             t_1h = f"{(12+tick_count)%24:02d}:00"
             t_1d = f"Dzień {day}"
