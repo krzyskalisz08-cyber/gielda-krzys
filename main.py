@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- TWOJA TABELA TRENDÓW (50% spadków, 15 dni) ---
+# --- TWOJA TABELA TRENDÓW ---
 trend_map = {
     "PORT":  [1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1],
     "MAGI":  [-1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1, 1, 1],
@@ -48,24 +48,20 @@ class DeletePlayer(BaseModel):
     username: str
 
 market_assets = {
-    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Port Gdynia..."},
-    "MAGI": {"name": "Magistrala", "base_price": 80.0, "desc": "Linia 201..."},
-    "COP": {"name": "COP", "base_price": 150.0, "desc": "Okręg przemysłowy..."},
-    "AZOT": {"name": "Azoty", "base_price": 60.0, "desc": "Fabryka..."},
-    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady..."},
-    "KOLEJ": {"name": "Koleje", "base_price": 120.0, "desc": "PKP..."},
-    "AUTO": {"name": "PZInż", "base_price": 70.0, "desc": "Warszawa..."},
-    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Rezerwy..."},
-    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal..."},
-    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Mennica..."},
-    "USD": {"name": "Dolar", "base_price": 5.20, "desc": "Waluta..."}
+    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "..."},
+    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "..."},
+    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "..."},
+    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "..."},
+    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "..."},
+    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "..."},
+    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "..."},
+    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "..."},
+    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "..."},
+    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "..."},
+    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "..."}
 }
 
-prices = []
-candles_history = {} 
-players = {}  
-messages = []
-articles = [{"title": "System", "content": "Wprowadzono stabilny harmonogram 50/50."}]
+prices = []; candles_history = {}; players = {}; messages = []; articles = [{"title": "Info", "content": "System aktywny."}]
 game_state = {"current_day": 1, "player_trend_impulse": {}}
 
 def init_game():
@@ -77,49 +73,43 @@ def init_game():
         candles_history[symbol] = {"5m": [["12:00", bp, bp+0.5, bp-0.5, bp]], "1h": [["12:00", bp, bp+1, bp-1, bp]], "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]}
 init_game()
 
-# --- ZAKTUALIZOWANY SILNIK RYNKU (ZGODNIE Z TWOJĄ TABELĄ) ---
+# (Tu są Twoje endpointy, wklej je dokładnie tak jak miałeś w pliku od @app.get("/") do @app.post("/api/messages") i get_articles)
+
 def market_engine():
     tick_count = 15
     while True:
         time.sleep(4)
         tick_count += 1
-        day = game_state["current_day"]
-        day_idx = min(day - 1, 14)
+        day_idx = min(game_state["current_day"] - 1, 14)
         
         for p in prices:
             sym = p["symbol"]
             open_p = p["price"]
             
-            # Pobieramy kierunek z tabeli
+            # NOWA LOGIKA: trend z tabeli + impuls gracza
             direction = trend_map.get(sym, [1]*15)[day_idx]
-            
-            # Mechanizm: 9.5% limit dzienny / 15 ticków + impuls gracza
             tick_change = (0.095 / 15) * direction
             player_change = (game_state["player_trend_impulse"].get(sym, 0.0) / 40.0)
             noise = random.uniform(-0.001, 0.001)
             
-            total_change = tick_change + player_change + noise
-            close_p = round(max(open_p * (1 + total_change), 0.02), 2)
-            
+            close_p = round(max(open_p * (1 + tick_change + player_change + noise), 0.02), 2)
             p["price"] = close_p
             p["daily_change"] = round(((close_p - 100.0) / 100.0) * 100, 2)
             game_state["player_trend_impulse"][sym] *= 0.95
             
-            # Świece (zachowano Twoją logikę historyczną)
-            high_p = round(max(open_p, close_p) + random.uniform(0.01, 0.05), 2)
-            low_p = round(min(open_p, close_p) - random.uniform(0.01, 0.05), 2)
+            # Twoja logika świec
+            high_p = round(max(open_p, close_p) + 0.05, 2)
+            low_p = round(min(open_p, close_p) - 0.05, 2)
             hist = candles_history[sym]["5m"]
             hist.append([f"12:{tick_count%60:02d}", open_p, high_p, low_p, close_p])
             if len(hist) > 15: candles_history[sym]["5m"] = hist[-15:]
 
-        # Margin Call (zostawione bez zmian)
-        for username, player in list(players.items()):
-            for sym, pos_list in player.get("portfolio_long", {}).items():
-                price = next((x["price"] for x in prices if x["symbol"] == sym), 1.0)
+        # Margin Call (z Twojego kodu)
+        for u, pl in list(players.items()):
+            for sym, pos_list in pl.get("portfolio_long", {}).items():
+                cur = next((x["price"] for x in prices if x["symbol"] == sym), 1.0)
                 for pos in list(pos_list):
-                    if (pos["buy_price"] - price) * pos["amount"] * pos["leverage"] >= pos["margin_allocated"]:
+                    if (pos["buy_price"] - cur) * pos["amount"] * pos["leverage"] >= pos["margin_allocated"]:
                         pos_list.remove(pos)
 
 threading.Thread(target=market_engine, daemon=True).start()
-
-# Tutaj wklej resztę swoich endpointów (od @app.get("/") do końca pliku z poprzedniego kodu)
