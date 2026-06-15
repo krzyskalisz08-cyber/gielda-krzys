@@ -20,7 +20,7 @@ app.add_middleware(
 class Transaction(BaseModel):
     username: str
     symbol: str
-    type: str 
+    type: str       # "buy_long", "sell_long", "open_short", "close_short"
     amount: float
     leverage: int
 
@@ -66,13 +66,13 @@ candles_history = {}
 players = {}  
 messages = []
 articles = [
-    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Rozpoczynamy bezpieczną symulację handlową."}
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Wprowadzono twarde limity salda oraz automatyczny mechanizm Margin Call chroniący przed debetami."}
 ]
 game_state = {"current_day": 1, "player_trend_impulse": {}}
 
 def init_game():
-    players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio": {}}
-    players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio": {}}
+    players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio_long": {}, "portfolio_short": {}}
+    players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
     
     for symbol, data in market_assets.items():
         prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"], "daily_change": 0.0})
@@ -84,11 +84,6 @@ def init_game():
             "1h": [["12:00", bp, bp+1, bp-1, bp]],
             "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]
         }
-        for i in range(1, 15):
-            t_5m = f"12:{i*5:02d}" if i*5 < 60 else f"13:{i*5-60:02d}"
-            candles_history[symbol]["5m"].append([t_5m, bp, bp+random.uniform(-0.5,0.5), bp+random.uniform(-0.5,0.5), bp])
-            candles_history[symbol]["1h"].append([f"{12+i}:00", bp, bp+random.uniform(-1,1), bp+random.uniform(-1,1), bp])
-            candles_history[symbol]["1d"].append([f"Dzień {i}", bp, bp+random.uniform(-2,2), bp+random.uniform(-2,2), bp])
 
 init_game()
 
@@ -103,7 +98,7 @@ def get_frontend():
 def register_player(cp: CreatePlayer):
     if cp.username in players: 
         return {"error": "Ta nazwa jest zajęta!"}
-    players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio": {}}
+    players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
     return {"status": f"Pomyślnie utworzono profil: {cp.username}"}
 
 @app.get("/api/prices")
@@ -122,18 +117,13 @@ def get_player_data(username: str, password: str):
         return {"error": "Błąd autoryzacji"}
     return {
         "balance": players[username]["balance"], 
-        "portfolio": players[username]["portfolio"], 
+        "portfolio_long": players[username].get("portfolio_long", {}), 
+        "portfolio_short": players[username].get("portfolio_short", {}), 
         "current_day": game_state["current_day"]
     }
 
-@app.get("/api/ranking")
-def get_ranking():
-    ranking_list = [{"name": u, "balance": d["balance"]} for u, d in players.items() if u != "admin"]
-    return sorted(ranking_list, key=lambda x: x["balance"], reverse=True)
-
 @app.get("/api/admin/players-list")
 def admin_get_players():
-    # Zwraca pełną listę graczy z hasłami i stanem konta (tylko dla admina na froncie)
     return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
 
 @app.post("/api/admin/delete-player")
@@ -150,6 +140,10 @@ def process_transaction(tx: Transaction):
     if tx.username not in players: 
         return {"error": "Brak gracza"}
     player = players[tx.username]
+    
+    if "portfolio_long" not in player: player["portfolio_long"] = {}
+    if "portfolio_short" not in player: player["portfolio_short"] = {}
+
     idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
     if idx is None: 
         return {"error": "Brak aktywa"}
@@ -158,41 +152,85 @@ def process_transaction(tx: Transaction):
     market_cap_reference = 500000.0 
     trade_value = tx.amount * asset_price
     
-    if tx.type == "buy":
+    # ---- 1. KUPNO POZYCJI DŁUGIEJ (LONG) ----
+    if tx.type == "buy_long":
         margin = trade_value / tx.leverage
         if player["balance"] < margin: 
-            return {"error": "Brak wolnych środków!"}
+            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
         player["balance"] -= margin
-        player["portfolio"][tx.symbol] = player["portfolio"].get(tx.symbol, [])
-        player["portfolio"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage})
+        player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
+        player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
-        impact = (trade_value / market_cap_reference) * 0.20
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.20)
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
         
-    elif tx.type == "sell":
-        positions = player["portfolio"].get(tx.symbol, [])
+    # ---- 2. ZAMKNIĘCIE POZYCJI DŁUGIEJ (SELL LONG) ----
+    elif tx.type == "sell_long":
+        positions = player["portfolio_long"].get(tx.symbol, [])
         if sum(pos["amount"] for pos in positions) < tx.amount: 
-            return {"error": "Brak wymaganej liczby jednostek!"}
+            return {"error": "Brak wymaganej liczby jednostek LONG!"}
         amt_to_rem = tx.amount
         refund = 0
         for pos in list(positions):
-            if amt_to_rem <= 0: 
-                break
+            if amt_to_rem <= 0: break
             if pos["amount"] <= amt_to_rem:
                 profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
-                refund += ((pos["buy_price"] * pos["amount"]) / pos["leverage"] + profit)
+                refund += (pos["margin_allocated"] + profit)
                 amt_to_rem -= pos["amount"]
                 positions.remove(pos)
             else:
+                fraction = amt_to_rem / pos["amount"]
+                allocated_part = pos["margin_allocated"] * fraction
                 profit = ((asset_price - pos["buy_price"]) * amt_to_rem) * pos["leverage"]
-                refund += ((pos["buy_price"] * amt_to_rem) / pos["leverage"] + profit)
+                refund += (allocated_part + profit)
+                pos["margin_allocated"] -= allocated_part
                 pos["amount"] -= amt_to_rem
                 amt_to_rem = 0
         player["balance"] += max(refund, 0.0)
-        player["portfolio"][tx.symbol] = positions
+        player["portfolio_long"][tx.symbol] = positions
         
-        impact = (trade_value / market_cap_reference) * 0.20
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.20)
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+
+    # ---- 3. OTWARCIE POZYCJI KRÓTKIEJ (OPEN SHORT) ----
+    elif tx.type == "open_short":
+        margin = trade_value / tx.leverage
+        if player["balance"] < margin: 
+            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
+        player["balance"] -= margin
+        player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
+        player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+
+    # ---- 4. ZAMKNIĘCIE POZYCJI KRÓTKIEJ (CLOSE SHORT) ----
+    elif tx.type == "close_short":
+        positions = player["portfolio_short"].get(tx.symbol, [])
+        if sum(pos["amount"] for pos in positions) < tx.amount: 
+            return {"error": "Brak wymaganej liczby jednostek SHORT do zamknięcia!"}
+        amt_to_rem = tx.amount
+        refund = 0
+        for pos in list(positions):
+            if amt_to_rem <= 0: break
+            if pos["amount"] <= amt_to_rem:
+                profit = ((pos["entry_price"] - asset_price) * pos["amount"]) * pos["leverage"]
+                refund += (pos["margin_allocated"] + profit)
+                amt_to_rem -= pos["amount"]
+                positions.remove(pos)
+            else:
+                fraction = amt_to_rem / pos["amount"]
+                allocated_part = pos["margin_allocated"] * fraction
+                profit = ((pos["entry_price"] - asset_price) * amt_to_rem) * pos["leverage"]
+                refund += (allocated_part + profit)
+                pos["margin_allocated"] -= allocated_part
+                pos["amount"] -= amt_to_rem
+                amt_to_rem = 0
+        player["balance"] += max(refund, 0.0)
+        player["portfolio_short"][tx.symbol] = positions
+        
+        impact = (trade_value / market_cap_reference) * 0.10
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
         
     return {"status": "ok"}
 
@@ -264,14 +302,11 @@ def market_engine():
                 if sym == "AUTO": history_trend = 0.018
                 if sym == "AZOT": history_trend = 0.014
                 if sym in ["MIEDZ", "SREBRO"]: history_trend = 0.007
-                if sym == "USD": history_trend = -0.001
             elif day in [10, 11, 12]:
                 if sym in ["SREBRO", "MIEDZ", "AUTO"]: history_trend = -0.035
                 if sym == "ZLOTO": history_trend = 0.022
-                if sym in ["PORT", "MAGI"]: history_trend = 0.004
             elif day == 13:
                 if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.026
-                if sym == "ZLOTO": history_trend = -0.012
             elif day == 14:
                 if sym == "ZLOTO": history_trend = 0.035
                 if sym in ["MIEDZ", "AUTO"]: history_trend = 0.01
@@ -313,7 +348,34 @@ def market_engine():
                     last[2] = max(last[2], high_p)
                     last[3] = min(last[3], low_p)
                     last[4] = close_p
-                if len(hist) > 15: 
-                    candles_history[sym][tf] = hist[-15:]
+                if len(hist) > 15: candles_history[sym][tf] = hist[-15:]
+
+        # ---- TWARDY MECHANIZM MARGIN CALL (LIKWIDACJA AUTOMATYCZNA) ----
+        for username, player in list(players.items()):
+            if username == "admin": continue
+            
+            # Sprawdzanie i czyszczenie pozycji LONG
+            for sym, positions in list(player.get("portfolio_long", {}).items()):
+                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                if current_price is None: continue
+                
+                for pos in list(positions):
+                    # Strata na LONG: (cena zakupu - cena obecna) * ilość * dźwignia
+                    loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
+                    if loss >= pos["margin_allocated"]:
+                        positions.remove(pos)
+                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
+            
+            # Sprawdzanie i czyszczenie pozycji SHORT
+            for sym, positions in list(player.get("portfolio_short", {}).items()):
+                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                if current_price is None: continue
+                
+                for pos in list(positions):
+                    # Strata na SHORT: (cena obecna - cena wejścia) * ilość * dźwignia
+                    loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
+                    if loss >= pos["margin_allocated"]:
+                        positions.remove(pos)
+                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
 
 threading.Thread(target=market_engine, daemon=True).start()

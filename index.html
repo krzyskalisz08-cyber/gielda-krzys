@@ -13,6 +13,7 @@
             --green: #26a69a;
             --red: #ef5350;
             --gold: #f39c12;
+            --purple: #ab47bc;
         }
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: var(--bg); color: var(--text); margin: 0; padding: 10px; }
@@ -23,37 +24,31 @@
         button:hover { background: #425c42; color: #fff; }
         button.btn-red { background: #5c2626; color: #ff9e9e; border: 1px solid #823838; }
         button.btn-red:hover { background: #733131; }
+        button.btn-purple { background: #4a148c; color: #ea80fc; border: 1px solid #7b1fa2; }
+        button.btn-purple:hover { background: #6a1b9a; }
         .grid-main { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        @media (min-width: 900px) {
-            .grid-main { grid-template-columns: 340px 1fr 340px; }
-        }
+        @media (min-width: 900px) { .grid-main { grid-template-columns: 340px 1fr 340px; } }
         .asset-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #1f291f; cursor: pointer; border-radius: 4px; transition: 0.2s; }
         .asset-row:hover, .asset-row.active { background: #1c241c; }
         .price-up { color: var(--green); font-weight: bold; text-align: right; }
         .price-down { color: var(--red); font-weight: bold; text-align: right; }
-        
-        #chart-container { width: 100%; height: 380px; background: #0e110e; border-radius: 6px; border: 1px solid #1f291f; position: relative; margin-bottom: 25px; cursor: crosshair; overflow: hidden; }
-        
+        #chart-container { width: 100%; height: 350px; background: #0e110e; border-radius: 6px; border: 1px solid #1f291f; position: relative; margin-bottom: 15px; cursor: crosshair; overflow: hidden; }
         .badge { background: #443c28; color: var(--gold); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #665734; }
         .portfolio-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-bottom: 1px dashed #1f291f; }
         .news-item { padding: 8px 0; border-bottom: 1px solid #1f291f; }
         .news-title { font-weight: bold; color: var(--khaki); font-size: 14px; }
         .news-content { font-size: 12px; color: #b2beb2; margin-top: 2px; }
-        #chat-box { height: 150px; overflow-y: auto; background: #0a0d0a; border: 1px solid #1f291f; padding: 8px; border-radius: 6px; font-size: 13px; margin-bottom: 5px; }
+        #chat-box { height: 130px; overflow-y: auto; background: #0a0d0a; border: 1px solid #1f291f; padding: 8px; border-radius: 6px; font-size: 13px; margin-bottom: 5px; }
         #chat-box div { margin-bottom: 5px; line-height: 1.4; }
         .flex-tabs { display: flex; gap: 5px; margin-bottom: 10px; }
         .flex-tabs button { padding: 6px; font-size: 12px; }
-        
         .chart-timeline-label { position: absolute; bottom: 2px; font-size: 10px; color: #667766; transform: translateX(-50%); white-space: nowrap; pointer-events: none; }
         .chart-price-label { position: absolute; right: 2px; font-size: 10px; color: #667766; transform: translateY(-50%); pointer-events: none; font-weight: bold; }
-        
         .chart-line-v { position: absolute; top: 0; bottom: 25px; width: 1px; border-left: 1px dashed rgba(156, 177, 128, 0.4); pointer-events: none; display: none; }
         .chart-line-h { position: absolute; left: 0; right: 65px; height: 1px; border-top: 1px dashed rgba(156, 177, 128, 0.4); pointer-events: none; display: none; }
         #chart-tooltip { position: absolute; top: 5px; left: 5px; background: rgba(19, 24, 19, 0.9); border: 1px solid var(--khaki); padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 10; pointer-events: none; display: none; line-height: 1.3; font-family: monospace; }
         .axis-tracker-y { position: absolute; right: 2px; background: var(--khaki); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; transform: translateY(-50%); font-weight: bold; display: none; pointer-events: none; z-index: 5; }
         .axis-tracker-x { position: absolute; bottom: 2px; background: var(--khaki); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; transform: translateX(-50%); font-weight: bold; display: none; pointer-events: none; z-index: 5; }
-        
-        /* Style dla tabeli admina */
         .admin-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; color: #fff; }
         .admin-table th { background: #2d2415; color: var(--gold); padding: 4px; border: 1px solid #473921; text-align: left; }
         .admin-table td { padding: 4px; border: 1px solid #473921; background: #13100a; }
@@ -62,8 +57,8 @@
 <body>
 
     <div id="login-screen" class="card" style="max-width: 400px; margin: 80px auto; padding: 25px;">
-        <h2>🏕️ GIEŁDA II RP</h2>
-        <p style="text-align:center; font-size:12px; color:#889988; margin-bottom:20px;">Terminal Mobilny dla Patroli Obozowych</p>
+        <h2> ️ GIEŁDA II RP</h2>
+        <p style="text-align:center; font-size:12px; color:#889988; margin-bottom:20px;">Terminal Wspierający Pozycje SHORT (Grę na spadki)</p>
         <label>Nazwa Patrolu (Login):</label>
         <input type="text" id="username" placeholder="np. Żubry">
         <label>Hasło:</label>
@@ -73,27 +68,21 @@
 
     <div id="main-screen" style="display: none;">
         <header class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;">
-            <div style="font-weight: bold; color: var(--khaki); display:flex; align-items:center; gap:8px;">
-                🪖 Patrol: <span id="display-username" style="color:#fff;">-</span>
-            </div>
-            <div style="font-weight: bold; color: var(--gold);">
-                💰 Środki: <span id="display-balance">0.00</span> zł
-            </div>
-            <div>
-                <span class="badge" style="font-size:13px; padding:4px 8px;">Dzień: <span id="display-day">1</span>/15</span>
-            </div>
+            <div style="font-weight: bold; color: var(--khaki);">🪖 Patrol: <span id="display-username" style="color:#fff;">-</span></div>
+            <div style="font-weight: bold; color: var(--gold);">💰 Środki: <span id="display-balance">0.00</span> zł</div>
+            <div><span class="badge" style="font-size:13px; padding:4px 8px;">Dzień: <span id="display-day">1</span>/15</span></div>
         </header>
 
         <div class="grid-main">
-            <div class="card" style="display: flex; flex-direction: column;">
+            <div class="card">
                 <h3>📊 Notowania Giełdowe</h3>
-                <div id="assets-list" style="flex: 1; overflow-y: auto; max-height: 600px;"></div>
+                <div id="assets-list" style="overflow-y: auto; max-height: 580px;"></div>
             </div>
 
             <div>
                 <div class="card">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <h3 id="chart-title" style="margin:0; text-align:left;">Wybierz aktywo</h3>
+                        <h3 id="chart-title" style="margin:0;">Wybierz aktywo</h3>
                         <div class="flex-tabs" style="margin:0;">
                             <button onclick="setTimeframe('5m')">5M</button>
                             <button onclick="setTimeframe('1h')">1H</button>
@@ -101,7 +90,7 @@
                         </div>
                     </div>
                     
-                    <div id="chart-container" onmousemove="handleChartHover(event)" onmouseleave="handleChartLeave()" onclick="handleChartHover(event)">
+                    <div id="chart-container" onmousemove="handleChartHover(event)" onmouseleave="handleChartLeave()">
                         <div id="chart-line-v" class="chart-line-v"></div>
                         <div id="chart-line-h" class="chart-line-h"></div>
                         <div id="axis-tracker-y" class="axis-tracker-y"></div>
@@ -109,49 +98,53 @@
                         <div id="chart-tooltip"></div>
                         <div id="chart-drawing-area" style="position:absolute; top:0; left:0; right:65px; bottom:25px;"></div>
                     </div>
-                    
-                    <p id="asset-desc" style="font-size:11.5px; color:#a2b0a2; margin:8px 0 0 0; line-height:1.4; font-style:italic; text-align:justify; background:#0e110e; padding:8px; border-radius:4px; border:1px solid #1a221a;"></p>
+                    <p id="asset-desc" style="font-size:11px; color:#a2b0a2; margin:5px 0; font-style:italic; background:#0e110e; padding:6px; border-radius:4px;"></p>
                 </div>
 
-                <div class="card grid-trade" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <h3 style="color:var(--green); font-size:15px; margin-bottom:5px;">📈 Otwórz Pozycję DŁUGĄ (Kupno)</h3>
-                        <label style="font-size:12px;">Ilość jednostek:</label>
-                        <input type="number" id="buy-amount" value="10" min="1">
-                        <label style="font-size:12px;">Dźwignia finansowa:</label>
-                        <select id="buy-leverage">
-                            <option value="1">Brak dźwigni (1x)</option>
-                            <option value="2">Dźwignia 2x</option>
-                            <option value="5">Dźwignia 5x</option>
+                <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div style="border-right: 1px solid #232d23; padding-right:10px;">
+                        <h3 style="color:var(--green); font-size:14px;">📈 Pozycje DŁUGIE (LONG - gra na wzrost)</h3>
+                        <label style="font-size:11px;">Ilość jednostek:</label>
+                        <input type="number" id="long-amount" value="10" min="1">
+                        <label style="font-size:11px;">Dźwignia finansowa:</label>
+                        <select id="long-leverage">
+                            <option value="1">1x (Brak)</option>
+                            <option value="2">2x</option>
+                            <option value="5">5x</option>
                         </select>
-                        <button onclick="trade('buy')">Zrealizuj Kupno (BUY)</button>
+                        <button onclick="trade('buy_long')">Otwórz LONG (Kupno)</button>
+                        <button class="btn-red" onclick="trade('sell_long')" style="font-size:12px; margin-top:2px;">Zamknij/Sprzedaj LONG</button>
                     </div>
-                    <div>
-                        <h3 style="color:var(--red); font-size:15px; margin-bottom:5px;">📉 Zamknij Pozycję (Sprzedaż)</h3>
-                        <label style="font-size:12px;">Ilość jednostek do upłynnienia:</label>
-                        <input type="number" id="sell-amount" value="10" min="1">
-                        <div style="height:48px;"></div>
-                        <button class="btn-red" onclick="trade('sell')">Zrealizuj Sprzedaż (SELL)</button>
+                    <div style="padding-left:10px;">
+                        <h3 style="color:var(--purple); font-size:14px;">📉 Pozycje KRÓTKIE (SHORT - gra na spadek)</h3>
+                        <label style="font-size:11px;">Ilość jednostek:</label>
+                        <input type="number" id="short-amount" value="10" min="1">
+                        <label style="font-size:11px;">Dźwignia finansowa:</label>
+                        <select id="short-leverage">
+                            <option value="1">1x (Brak)</option>
+                            <option value="2">2x</option>
+                            <option value="5">5x</option>
+                        </select>
+                        <button class="btn-purple" onclick="trade('open_short')">Otwórz SHORT (Sprzedaż nr)</button>
+                        <button onclick="trade('close_short')" style="font-size:12px; margin-top:2px; background:#4a5c4a;">Zamknij/Odkup SHORT</button>
                     </div>
                 </div>
             </div>
 
             <div>
                 <div class="card">
-                    <h3>💼 Twój Portfel Inwestycyjny</h3>
-                    <div id="portfolio-list" style="max-height: 180px; overflow-y: auto;"></div>
+                    <h3>💼 Otwarte Pozycje LONG i SHORT</h3>
+                    <div id="portfolio-list" style="max-height: 200px; overflow-y: auto;"></div>
                 </div>
 
                 <div class="card" style="border: 1px solid var(--khaki); background: #161e16;">
-                    <h3 style="color: var(--khaki); margin-bottom:5px;">📌 Tablica Ogłoszeń Komendy</h3>
-                    <div id="board-container" style="font-size:12.5px; line-height:1.4; color:#fff; max-height:80px; overflow-y:auto; font-weight:500; text-align:center;">
-                        Brak najnowszych rozkazów na tablicy.
-                    </div>
+                    <h3>📌 Tablica Ogłoszeń Komendy</h3>
+                    <div id="board-container" style="font-size:12px; font-weight:bold; text-align:center;">Brak rozkazów.</div>
                 </div>
 
                 <div class="card">
-                    <h3>📰 Wiadomości i Depesze</h3>
-                    <div id="news-list" style="max-height: 130px; overflow-y: auto;"></div>
+                    <h3>📰 Depesze i Wiadomości</h3>
+                    <div id="news-list" style="max-height: 110px; overflow-y: auto;"></div>
                 </div>
 
                 <div class="card">
@@ -163,54 +156,41 @@
                     </div>
                 </div>
 
-                <!-- ZMODYFIKOWANY PANEL DRUHA PROWADZĄCEGO (ADMINA) -->
                 <div id="admin-panel" class="card" style="display: none; border: 1px solid var(--gold); background: #1a160e;">
                     <h3 style="color: var(--gold);">⚔️ Panel Druha Prowadzącego</h3>
-                    <button onclick="adminNextDay()" style="background:#5e481b; color:#fff; border:1px solid var(--gold);">Przewiń symulację o 1 Dzień/Rok w przód</button>
+                    <button onclick="adminNextDay()" style="background:#5e481b; color:#fff; border:1px solid var(--gold);">Przewiń symulację o 1 Dzień</button>
                     
-                    <!-- NOWA SEKCJA: Zarządzanie i Lista Graczy -->
-                    <div style="border-top: 1px solid #3a301c; margin-top: 8px; padding-top: 5px;">
-                        <label style="font-size:11px; color:var(--gold); font-weight:bold;">👥 Lista Patroli i Usuwanie Kont:</label>
-                        <div style="max-height:150px; overflow-y:auto; margin-top:4px;">
-                            <table class="admin-table">
-                               <thead>
-                                   <tr>
-                                       <th>Patrol (Login)</th>
-                                       <th>Hasło</th>
-                                       <th>Gotówka</th>
-                                       <th>Akcja</th>
-                                   </tr>
-                               </thead>
-                               <tbody id="admin-players-table-body"></tbody>
-                            </table>
-                        </div>
+                    <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
+                        <label style="font-size:11px; color:var(--gold); font-weight:bold;">👥 Zarządzanie Patrolami:</label>
+                        <table class="admin-table">
+                           <thead><tr><th>Patrol</th><th>Hasło</th><th>Konto</th><th>Akcja</th></tr></thead>
+                           <tbody id="admin-players-table-body"></tbody>
+                        </table>
                     </div>
 
-                    <div style="border-top: 1px solid #3a301c; margin-top: 8px; padding-top: 5px;">
-                        <label style="font-size:11px; color:var(--gold); font-weight:bold;">📈 Ręczna interwencja w kursy rynkowe:</label>
-                        <select id="admAssetSelect" style="padding:5px; font-size:12px;"></select>
-                        <input type="number" id="admPercentChange" placeholder="Procent zmiany np. 12.5 lub -8" step="0.1" style="padding:5px; font-size:12px;">
-                        <button onclick="adminChangeAssetPrice()" style="padding:5px; font-size:12px; background:#a36214; color:#fff; border:1px solid var(--gold);">Wymuś zmianę kursu (%)</button>
+                    <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
+                        <label style="font-size:11px; color:var(--gold);">📈 Interwencja w ceny (%):</label>
+                        <select id="admAssetSelect" style="padding:4px; font-size:12px;"></select>
+                        <input type="number" id="admPercentChange" placeholder="np. 10 lub -15" step="0.1" style="padding:4px; font-size:12px;">
+                        <button onclick="adminChangeAssetPrice()" style="padding:4px; background:#a36214; color:#fff;">Wymuś zmianę kursu</button>
                     </div>
 
-                    <div style="border-top: 1px solid #3a301c; margin-top: 8px; padding-top: 5px;">
-                        <label style="font-size:11px; color:var(--gold); font-weight:bold;">➕ Zarejestruj Nowy Patrol:</label>
-                        <input type="text" id="regUser" placeholder="Nazwa nowego patrolu" style="padding:5px; font-size:12px;">
-                        <input type="password" id="regPass" placeholder="Hasło dla patrolu" style="padding:5px; font-size:12px;">
-                        <button onclick="adminRegisterPatrol()" style="padding:5px; font-size:12px; background:#475c47; color:#fff;">Stwórz Profil Patrolu</button>
+                    <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
+                        <label style="font-size:11px; color:var(--gold);">➕ Dodaj Nowy Patrol:</label>
+                        <input type="text" id="regUser" placeholder="Login" style="padding:4px;"><input type="password" id="regPass" placeholder="Hasło" style="padding:4px;">
+                        <button onclick="adminRegisterPatrol()" style="padding:4px; background:#475c47; color:#fff;">Rejestruj Patrol</button>
                     </div>
 
-                    <div style="border-top: 1px solid #3a301c; margin-top: 8px; padding-top: 5px;">
-                        <label style="font-size:11px; color:var(--gold);">Dolej gotówki dla patrolu:</label>
-                        <input type="text" id="admTarget" placeholder="Nazwa patrolu" style="padding:5px; font-size:12px;">
-                        <input type="number" id="admCash" placeholder="Kwota (zł)" style="padding:5px; font-size:12px;">
-                        <button onclick="adminGiveCash()" style="padding:5px; font-size:12px;">Zasil konto patrolu</button>
+                    <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
+                        <label style="font-size:11px; color:var(--gold);">Dolej gotówki:</label>
+                        <input type="text" id="admTarget" placeholder="Patrol" style="padding:4px;"><input type="number" id="admCash" placeholder="Kwota" style="padding:4px;">
+                        <button onclick="adminGiveCash()" style="padding:4px;">Zasil konto</button>
                     </div>
 
-                    <div style="border-top: 1px solid #3a301c; margin-top: 8px; padding-top: 5px;">
-                        <label style="font-size:11px; color:var(--gold);">Wpisz Rozkaz na Tablicę Ogłoszeń:</label>
-                        <input type="text" id="admAnnounce" placeholder="Treść ważnego ogłoszenia..." style="padding:5px; font-size:12px;">
-                        <button onclick="adminPostAnnouncement()" style="padding:5px; font-size:12px; background:#f39c12; color:#000;">Opublikuj na Tablicy</button>
+                    <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
+                        <label style="font-size:11px; color:var(--gold);">Rozkaz na Tablicę:</label>
+                        <input type="text" id="admAnnounce" placeholder="Treść ogłoszenia..." style="padding:4px;">
+                        <button onclick="adminPostAnnouncement()" style="padding:4px; background:var(--gold); color:#000;">Opublikuj Rozkaz</button>
                     </div>
                 </div>
             </div>
@@ -245,13 +225,11 @@
             const u = document.getElementById("regUser").value.trim();
             const p = document.getElementById("regPass").value.trim();
             if(!u || !p) return alert("Wpisz dane!");
-            
             const res = await fetch(`${API_URL}/api/register`, {
                 method: "POST", headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({ username: u, password: p })
             });
-            const d = await res.json();
-            alert(d.status || d.error);
+            const d = await res.json(); alert(d.status || d.error);
             if(!d.error) { document.getElementById("regUser").value = ""; document.getElementById("regPass").value = ""; loadAdminPlayersList(); }
         }
 
@@ -271,71 +249,53 @@
             if(localPrices.length > 0 && !selectedAsset) { selectedAsset = localPrices[0].symbol; }
 
             renderAssets(); renderAdminAssetSelect();
-            renderPortfolio(playerData.portfolio);
+            renderCombinedPortfolio(playerData.portfolio_long, playerData.portfolio_short);
+            
             document.getElementById("display-balance").innerText = playerData.balance.toFixed(2);
             document.getElementById("display-day").innerText = playerData.current_day;
 
             const resArt = await fetch(`${API_URL}/api/articles`);
-            const articles = await resArt.json();
-            renderNews(articles);
+            const articles = await resArt.json(); renderNews(articles);
 
             if(selectedAsset) renderChart();
             if(currentUser === "admin") loadAdminPlayersList();
         }
 
-        // Funkcja ładująca listę użytkowników do tabeli admina
         async function loadAdminPlayersList() {
             const res = await fetch(`${API_URL}/api/admin/players-list`);
             const pList = await res.json();
             const tbody = document.getElementById("admin-players-table-body");
-            if(!tbody) return;
-            tbody.innerHTML = "";
+            if(!tbody) return; tbody.innerHTML = "";
             pList.forEach(p => {
                 const isSystemAdmin = p.username === "admin";
-                const btnHtml = isSystemAdmin 
-                    ? `<span style="color:#666;">Główny</span>` 
-                    : `<button class="btn-red" style="padding:2px 6px; font-size:10px; margin:0;" onclick="adminDeletePlayer('${p.username}')">Usuń</button>`;
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td style="font-weight:bold; color:${isSystemAdmin?'var(--gold)':'#fff'};">${p.username}</td>
-                        <td><code style="background:#222; padding:1px 3px; border-radius:3px;">${p.password}</code></td>
-                        <td>${p.balance.toFixed(2)} zł</td>
-                        <td style="text-align:center;">${btnHtml}</td>
-                    </tr>`;
+                const btnHtml = isSystemAdmin ? `<span style="color:#666;">Główny</span>` : `<button class="btn-red" style="padding:2px 4px; font-size:10px; margin:0;" onclick="adminDeletePlayer('${p.username}')">Usuń</button>`;
+                tbody.innerHTML += `<tr><td><b>${p.username}</b></td><td><code>${p.password}</code></td><td>${p.balance.toFixed(2)}</td><td>${btnHtml}</td></tr>`;
             });
         }
 
-        // Funkcja usuwająca wybranego gracza z poziomu admina
         async function adminDeletePlayer(targetUser) {
-            if(!confirm(`Czy na pewno chcesz CAŁKOWICIE USUNĄĆ gracza/patrol: "${targetUser}"? Wszystkie jego pozycje przepadną.`)) return;
+            if(!confirm(`Usunąć całkowicie patrol: "${targetUser}"?`)) return;
             const res = await fetch(`${API_URL}/api/admin/delete-player`, {
-                method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ username: targetUser })
+                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ username: targetUser })
             });
-            const d = await res.json();
-            alert(d.status || d.error);
-            loadAdminPlayersList();
+            const d = await res.json(); alert(d.status || d.error); loadAdminPlayersList();
         }
 
         function renderAdminAssetSelect() {
             const select = document.getElementById("admAssetSelect");
             if(!select || select.children.length === localPrices.length) return; 
             select.innerHTML = "";
-            localPrices.forEach(a => { select.innerHTML += `<option value="${a.symbol}">${a.symbol} - ${a.name}</option>`; });
+            localPrices.forEach(a => { select.innerHTML += `<option value="${a.symbol}">${a.symbol}</option>`; });
         }
 
         async function adminChangeAssetPrice() {
             const symbol = document.getElementById("admAssetSelect").value;
             const percent = parseFloat(document.getElementById("admPercentChange").value);
             if(isNaN(percent)) return alert("Wpisz poprawną wartość!");
-
             const res = await fetch(`${API_URL}/api/admin/change-percent`, {
-                method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ symbol: symbol, percent: percent })
+                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ symbol: symbol, percent: percent })
             });
-            const d = await res.json(); alert(d.status || d.error);
-            document.getElementById("admPercentChange").value = ""; updateGameData();
+            const d = await res.json(); alert(d.status || d.error); document.getElementById("admPercentChange").value = ""; updateGameData();
         }
 
         function renderAssets() {
@@ -344,18 +304,10 @@
                 const act = a.symbol === selectedAsset ? "active" : "";
                 const chg = a.daily_change || 0;
                 const chgClass = chg >= 0 ? "price-up" : "price-down";
-                const chgSign = chg >= 0 ? "+" : "";
-
                 container.innerHTML += `
                     <div class="asset-row ${act}" onclick="selectAsset('${a.symbol}')">
-                        <div>
-                            <div style="font-weight:bold;">${a.symbol}</div>
-                            <div style="font-size:11px; color:#889988;">${a.name}</div>
-                        </div>
-                        <div class="${chgClass}">
-                            <div>${a.price.toFixed(2)} zł</div>
-                            <div style="font-size:11px; font-weight:normal;">${chgSign}${chg}%</div>
-                        </div>
+                        <div><b>${a.symbol}</b><br><span style="font-size:10px; color:#889988;">${a.name}</span></div>
+                        <div class="${chgClass}">${a.price.toFixed(2)} zł<br><span style="font-size:10px; font-weight:normal;">${chg >= 0 ? '+' : ''}${chg}%</span></div>
                     </div>`;
             });
         }
@@ -376,53 +328,43 @@
             if(!selectedAsset) return;
             const res = await fetch(`${API_URL}/api/candles/${selectedAsset}/${currentTimeframe}`);
             const candles = await res.json(); activeCandles = candles;
-            
             const container = document.getElementById("chart-drawing-area");
             const fullContainer = document.getElementById("chart-container");
             
             container.innerHTML = "";
             fullContainer.querySelectorAll('.chart-price-label, .chart-timeline-label').forEach(el => el.remove());
-            
             if(!candles || candles.length === 0) return;
 
             let pricesList = candles.map(c => [c[1], c[2], c[3], c[4]]).flat();
             let minP = Math.min(...pricesList); let maxP = Math.max(...pricesList);
-            let range = maxP - minP || 1;
-            minP -= range * 0.05; maxP += range * 0.05; range = maxP - minP;
-            
+            let range = maxP - minP || 1; minP -= range * 0.05; maxP += range * 0.05; range = maxP - minP;
             globalChartMin = minP; globalChartMax = maxP;
+            
             let w = container.clientWidth; let h = container.clientHeight;
             let numCandles = candles.length; let candleW = (w / numCandles);
 
-            let steps = 5;
-            for(let i = 0; i <= steps; i++) {
-                let pVal = minP + (range * (i / steps)); let yPos = h - (i / steps) * h;
+            for(let i = 0; i <= 4; i++) {
+                let pVal = minP + (range * (i / 4)); let yPos = h - (i / 4) * h;
                 let lblPrice = document.createElement("div"); lblPrice.className = "chart-price-label";
-                lblPrice.style.top = `${yPos}px`; lblPrice.innerText = `${pVal.toFixed(2)} zł`;
-                fullContainer.appendChild(lblPrice);
+                lblPrice.style.top = `${yPos}px`; lblPrice.innerText = `${pVal.toFixed(2)} zł`; fullContainer.appendChild(lblPrice);
             }
 
             candles.forEach((c, idx) => {
                 let [label, open, high, low, close] = c;
                 let isUp = close >= open; let color = isUp ? "var(--green)" : "var(--red)";
                 let x = idx * candleW + (candleW * 0.15); let cw = candleW * 0.7;
-
                 let yOpen = h - ((open - minP) / range) * h; let yClose = h - ((close - minP) / range) * h;
                 let yHigh = h - ((high - minP) / range) * h; let yLow = h - ((low - minP) / range) * h;
-                let yTop = Math.min(yOpen, yClose); let yBot = Math.max(yOpen, yClose);
-                let bodyH = Math.max(yBot - yTop, 2);
-
+                
                 let wick = document.createElement("div");
-                wick.style.position = "absolute"; wick.style.left = `${x + cw/2}px`;
-                wick.style.top = `${yHigh}px`; wick.style.height = `${yLow - yHigh}px`;
-                wick.style.width = "1.5px"; wick.style.background = color; container.appendChild(wick);
+                wick.style.position = "absolute"; wick.style.left = `${x + cw/2}px`; wick.style.top = `${yHigh}px`;
+                wick.style.height = `${yLow - yHigh}px`; wick.style.width = "1.5px"; wick.style.background = color; container.appendChild(wick);
 
                 let body = document.createElement("div");
-                body.style.position = "absolute"; body.style.left = `${x}px`;
-                body.style.top = `${yTop}px`; body.style.height = `${bodyH}px`;
-                body.style.width = `${cw}px`; body.style.background = color; container.appendChild(body);
+                body.style.position = "absolute"; body.style.left = `${x}px`; body.style.top = `${Math.min(yOpen, yClose)}px`;
+                body.style.height = `${Math.max(Math.abs(yOpen - yClose), 2)}px`; body.style.width = `${cw}px`; body.style.background = color; container.appendChild(body);
 
-                if(idx % 3 === 0 || idx === numCandles - 1) {
+                if(idx % 4 === 0 || idx === numCandles - 1) {
                     let lblTime = document.createElement("div"); lblTime.className = "chart-timeline-label";
                     lblTime.style.left = `${x + cw/2}px`; lblTime.innerText = label; fullContainer.appendChild(lblTime);
                 }
@@ -434,15 +376,14 @@
             const container = document.getElementById("chart-drawing-area");
             const rect = container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
-            
             if(mouseX < 0 || mouseX > rect.width || mouseY < 0 || mouseY > rect.height) { handleChartLeave(); return; }
             
             const numCandles = activeCandles.length; const candleW = rect.width / numCandles;
             let candleIdx = Math.floor(mouseX / candleW);
             if(candleIdx < 0) candleIdx = 0; if(candleIdx >= numCandles) candleIdx = numCandles - 1;
             
-            const candle = activeCandles[candleIdx]; const [label, open, high, low, close] = candle;
-            const range = globalChartMax - globalChartMin; const hoverPrice = globalChartMax - (mouseY / rect.height) * range;
+            const [label, open, high, low, close] = activeCandles[candleIdx];
+            const hoverPrice = globalChartMax - (mouseY / rect.height) * (globalChartMax - globalChartMin);
             
             const lineV = document.getElementById("chart-line-v"); const lineH = document.getElementById("chart-line-h");
             const trackerY = document.getElementById("axis-tracker-y"); const trackerX = document.getElementById("axis-tracker-x");
@@ -451,18 +392,11 @@
             
             lineV.style.display = "block"; lineV.style.left = `${exactX}px`;
             lineH.style.display = "block"; lineH.style.top = `${mouseY}px`;
-            
             trackerY.style.display = "block"; trackerY.style.top = `${mouseY}px`; trackerY.innerText = `${hoverPrice.toFixed(2)} zł`;
             trackerX.style.display = "block"; trackerX.style.left = `${exactX}px`; trackerX.innerText = label;
             
             tooltip.style.display = "block";
-            tooltip.innerHTML = `
-                <div style="color:var(--khaki); font-weight:bold; border-bottom:1px solid #334433; margin-bottom:3px; padding-bottom:2px;">⏱️ ${label}</div>
-                <div>O: <span style="color:#fff">${open.toFixed(2)}</span></div>
-                <div>H: <span style="color:var(--green)">${high.toFixed(2)}</span></div>
-                <div>L: <span style="color:var(--red)">${low.toFixed(2)}</span></div>
-                <div>C: <span style="color:#fff">${close.toFixed(2)}</span></div>
-            `;
+            tooltip.innerHTML = `⏱️ <b>${label}</b><br>O: ${open.toFixed(2)}<br>H: <span style='color:var(--green)'>${high.toFixed(2)}</span><br>L: <span style='color:var(--red)'>${low.toFixed(2)}</span><br>C: ${close.toFixed(2)}`;
         }
 
         function handleChartLeave() {
@@ -471,63 +405,71 @@
             document.getElementById("chart-tooltip").style.display = "none";
         }
 
-        function renderPortfolio(portfolio) {
-            const box = document.getElementById("portfolio-list"); box.innerHTML = ""; let empty = true;
-            for(let symbol in portfolio) {
-                let positions = portfolio[symbol]; if(!positions || positions.length === 0) continue; empty = false;
-                let totalAmt = positions.reduce((sum, p) => sum + p.amount, 0);
-                let avgPrice = positions.reduce((sum, p) => sum + (p.buy_price * p.amount), 0) / totalAmt;
-                let lev = positions[0].leverage;
-                
-                const currentAsset = localPrices.find(p => p.symbol === symbol);
-                let currentMarketPrice = currentAsset ? currentAsset.price : avgPrice;
-                
-                let profitCash = (currentMarketPrice - avgPrice) * totalAmt * lev;
-                let profitPercent = ((currentMarketPrice - avgPrice) / avgPrice) * 100 * lev;
-                let pnlClass = profitCash >= 0 ? "price-up" : "price-down"; let pnlSign = profitCash >= 0 ? "+" : "";
-                
+        function renderCombinedPortfolio(pLong, pShort) {
+            const box = document.getElementById("portfolio-list"); box.innerHTML = "";
+            let empty = true;
+
+            for(let symbol in pLong) {
+                let pos = pLong[symbol]; if(!pos || pos.length === 0) continue; empty = false;
+                let amt = pos.reduce((s, p) => s + p.amount, 0);
+                let avg = pos.reduce((s, p) => s + (p.buy_price * p.amount), 0) / amt;
+                let cur = (localPrices.find(p => p.symbol === symbol) || {price: avg}).price;
+                let pnl = (cur - avg) * amt * pos[0].leverage;
                 box.innerHTML += `
                     <div class="portfolio-item">
-                        <div>
-                            <b>${symbol}</b> (${totalAmt} szt.)
-                            <div style="font-size:11px; color:#889988;">Śr. kupno: ${avgPrice.toFixed(2)} (x${lev})</div>
-                        </div>
-                        <div style="text-align:right; margin-right:10px;">
-                            <div class="${pnlClass}" style="font-size:13px;">${pnlSign}${profitCash.toFixed(2)} zł</div>
-                            <div class="${pnlClass}" style="font-size:11px; font-weight:normal;">${pnlSign}${profitPercent.toFixed(1)}%</div>
-                        </div>
-                        <button class="btn-red" style="width:auto; padding:5px 10px; font-size:11px; margin:0;" onclick="quickClosePosition('${symbol}', ${totalAmt})">[X] Zamknij</button>
+                        <div>📈 <b style="color:var(--green)">${symbol} LONG</b> (${amt} szt.)<br><span style="font-size:11px;color:#889888;">Śr: ${avg.toFixed(2)} (x${pos[0].leverage})</span></div>
+                        <div class="${pnl>=0?'price-up':'price-down'}">${pnl>=0?'+':''}${pnl.toFixed(2)} zł</div>
+                        <button class="btn-red" style="width:auto; padding:4px 8px; font-size:11px;" onclick="quickClose('${symbol}', ${amt}, 'sell_long')">Zwiń</button>
                     </div>`;
             }
-            if(empty) box.innerHTML = `<p style="font-size:12px;color:#667766;text-align:center;margin:15px 0;">Brak otwartych pozycji.</p>`;
+
+            for(let symbol in pShort) {
+                let pos = pShort[symbol]; if(!pos || pos.length === 0) continue; empty = false;
+                let amt = pos.reduce((s, p) => s + p.amount, 0);
+                let avg = pos.reduce((s, p) => s + (p.entry_price * p.amount), 0) / amt;
+                let cur = (localPrices.find(p => p.symbol === symbol) || {price: avg}).price;
+                let pnl = (avg - cur) * amt * pos[0].leverage;
+                box.innerHTML += `
+                    <div class="portfolio-item">
+                        <div>📉 <b style="color:var(--purple)">${symbol} SHORT</b> (${amt} szt.)<br><span style="font-size:11px;color:#889888;">Śr: ${avg.toFixed(2)} (x${pos[0].leverage})</span></div>
+                        <div class="${pnl>=0?'price-up':'price-down'}">${pnl>=0?'+':''}${pnl.toFixed(2)} zł</div>
+                        <button class="btn-purple" style="width:auto; padding:4px 8px; font-size:11px;" onclick="quickClose('${symbol}', ${amt}, 'close_short')">Odkup</button>
+                    </div>`;
+            }
+            if(empty) box.innerHTML = `<p style="font-size:12px;color:#667766;text-align:center;margin:15px 0;">Brak otwartych pozycji rynkowych.</p>`;
         }
 
-        function quickClosePosition(symbol, amount) { selectAsset(symbol); document.getElementById("sell-amount").value = amount; trade('sell'); }
-
-        function renderNews(articles) {
-            const box = document.getElementById("news-list"); box.innerHTML = ""; let rev = [...articles].reverse();
-            rev.forEach(a => { box.innerHTML += `<div class="news-item"><div class="news-title">${a.title}</div><div class="news-content">${a.content}</div></div>`; });
-        }
-
-        async function adminPostAnnouncement() {
-            const text = document.getElementById("admAnnounce").value.trim(); if(!text) return alert("Wpisz ogłoszenie!");
-            await fetch(`${API_URL}/api/messages`, {
-                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ player: "OGŁOSZENIE KOMENDY", text: text })
-            });
-            document.getElementById("admAnnounce").value = ""; loadChat();
+        function quickClose(sym, amt, type) {
+            selectAsset(sym);
+            if(type === 'sell_long') { document.getElementById("long-amount").value = amt; trade('sell_long'); }
+            else { document.getElementById("short-amount").value = amt; trade('close_short'); }
         }
 
         async function trade(type) {
             if(!selectedAsset) return alert("Wybierz aktywo!");
-            const amt = parseFloat(document.getElementById(`${type}-amount`).value);
-            const lev = parseInt(document.getElementById("buy-leverage").value);
+            const category = type.includes("long") ? "long" : "short";
+            const amt = parseFloat(document.getElementById(`${category}-amount`).value);
+            const lev = parseInt(document.getElementById(`${category}-leverage`).value);
             if(isNaN(amt) || amt <= 0) return alert("Wpisz poprawną wartość!");
 
             const res = await fetch(`${API_URL}/api/transactions`, {
                 method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ username: currentUser, symbol: selectedAsset, type: type, amount: amt, leverage: type==='buy'?lev:1 })
+                body: JSON.stringify({ username: currentUser, symbol: selectedAsset, type: type, amount: amt, leverage: lev })
             });
             const d = await res.json(); if(d.error) alert(d.error); else updateGameData();
+        }
+
+        function renderNews(articles) {
+            const box = document.getElementById("news-list"); box.innerHTML = "";
+            [...articles].reverse().forEach(a => { box.innerHTML += `<div class="news-item"><div class="news-title">${a.title}</div><div class="news-content">${a.content}</div></div>`; });
+        }
+
+        async function adminPostAnnouncement() {
+            const text = document.getElementById("admAnnounce").value.trim(); if(!text) return alert("Wpisz treść rozkazu!");
+            await fetch(`${API_URL}/api/messages`, {
+                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ player: "OGŁOSZENIE KOMENDY", text: text })
+            });
+            document.getElementById("admAnnounce").value = ""; loadChat();
         }
 
         async function loadChat() {
@@ -538,7 +480,7 @@
 
             msgs.forEach(m => {
                 if(m.player === "OGŁOSZENIE KOMENDY") { lastAnnouncement = `📢 <b>${m.text}</b>`; }
-                let tag = m.player === "admin" ? `<span class="badge">DRUH</span>` : (m.player === "OGŁOSZENIE KOMENDY" ? `<span class="badge" style="background:#5c2626; color:#ff9e9e;">ROZKAZ</span>` : `<b>${m.player}</b>`);
+                let tag = m.player === "admin" ? `<span class="badge">DRUH</span>` : (m.player === "OGŁOSZENIE KOMENDY" ? `<span class="badge" style="background:#5c2626; color:#ff9e9e;">ROZKAZ</span>` : (m.player === "SYSTEM" ? `<span class="badge" style="background:#ef5350; color:#fff;">LIKWIDACJA</span>` : `<b>${m.player}</b>`));
                 box.innerHTML += `<div>${tag}: ${m.text}</div>`;
             });
             board.innerHTML = lastAnnouncement; box.scrollTop = box.scrollHeight;
@@ -548,8 +490,7 @@
             const el = document.getElementById("chatText"); const text = el.value.trim(); if(!text) return;
             await fetch(`${API_URL}/api/messages`, {
                 method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ player: currentUser, text: text })
-            });
-            el.value = ""; loadChat();
+            }); el.value = ""; loadChat();
         }
 
         async function adminGiveCash() {
