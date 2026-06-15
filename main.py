@@ -7,7 +7,7 @@ import threading
 import time
 import os
 
-app = FastAPI(title="Giełda II RP - Wersja Pro Pro")
+app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,17 +17,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------- MODELE DANYCH ----------------
 class Transaction(BaseModel):
     username: str
     symbol: str
-    type: str # "buy" / "sell"
+    type: str 
     amount: float
     leverage: int
 
 class Message(BaseModel):
     player: str
     text: str
+
+class Article(BaseModel):
+    title: str
+    content: str
 
 class CreatePlayer(BaseModel):
     username: str
@@ -37,57 +40,90 @@ class AddMoney(BaseModel):
     username: str
     amount: float
 
-class SetTrend(BaseModel):
+class SetPercentChange(BaseModel):
     symbol: str
-    trend: float
+    percent: float
 
-# ---------------- STRUKTURA DANYCH II RP ----------------
-game_state = {
-    "current_day": 1,
-    "admin_trends": {},
-    "player_impact": {} # Śledzenie wpływu graczy na rynek, aby nie przekroczył 20%
-}
-
+# CAŁKOWICIE NOWE, ROZBUDOWANE, FAKTOGRAFICZNE MEMORANDA (BEZ PREDYKCJI)
 market_assets = {
-    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Budowa przynosi 40-60 mln zł rocznie. Koszt: 300 mln. Ryzyko średnie. Stabilny wzrost w długiej perspektywie."},
-    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Transport węgla. Przychody 30-50 mln zł rocznie. Koszt: 250 mln. Niskie ryzyko, stabilny popyt."},
-    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 250.0, "desc": "Strategiczny projekt państwowy. Koszt >3 mld zł. Początkowe straty, potem potężne zyski (100-150 mln)."},
-    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 50.0, "desc": "Produkcja nawozów. Koszt: 100 mln. Zysk 5-8 mln rocznie. Stabilny popyt, ryzyko umiarkowane."},
-    "STAL": {"name": "Stalowa Wola", "base_price": 120.0, "desc": "Przemysł ciężki i wojskowy. Koszt: 200 mln. Zależne od zamówień rządowych i obronnych."},
-    "KOLEJ": {"name": "Spółka Kolejowa (PKP)", "base_price": 150.0, "desc": "Modernizacja sieci. Koszt: 500 mln. Bardzo bezpieczna lokata, podstawa gospodarki."},
-    "AUTO": {"name": "Fabryka Samochodów", "base_price": 70.0, "desc": "Budowa pod Warszawą. Koszt: 150 mln. Wysoka niepewność popytu, rynek dopiero startuje."},
-    "ZLOTO": {"name": "Złoto (PZBP)", "base_price": 45.0, "desc": "Kruszec lokacyjny, bezpieczna przystań w czasach niepewności geopolitycznej."},
-    "MIEDZ": {"name": "Miedź", "base_price": 15.0, "desc": "Surowiec strategiczny dla elektryczności i przemysłu zbrojeniowego COP."},
-    "SREBRO": {"name": "Srebro", "base_price": 22.0, "desc": "Wykorzystywane w przemyśle oraz do bicia monet obiegowych w II RP."},
-    "USD": {"name": "Dolar Amerykański", "base_price": 5.30, "desc": "Twarda waluta zagraniczna. Kurs zależny od sytuacji na świecie."}
+    "PORT": {
+        "name": "Port w Gdyni", 
+        "base_price": 100.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kompleks portowy zlokalizowany nad Zatoką Gdańską. Budowa rozpoczęta na mocy ustawy z dnia 23 września 1922 roku. Infrastruktura obejmuje tzw. Port Tymczasowy (wzniesiony kosztem około 25 milionów marek polskich), a docelowy projekt przewiduje baseny o głębokości do 10 metrów, nabrzeża przeładunkowe (m.in. Indyjskie, Rotterdamskie), falochron osłonowy o długości ponad 2 kilometrów oraz nowoczesną łuszczarnię ryżu i chłodnię składową. Roczne zdolności przeładunkowe w pierwszym etapie oszacowano na 2,5 miliona ton towarów, głównie węgla kamiennego i drewna."
+    },
+    "MAGI": {
+        "name": "Magistrala Śląsk-Gdynia", 
+        "base_price": 80.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość trasy wynosi dokładnie 452 kilometry. Państwowy projekt budowlany mający na celu bezpośrednie ominięcie terytorium Wolnego Miasta Gdańska. Prowadzi ruch towarowy przez stacje węzłowe Zduńska Wola Karsznice oraz Inowrocław. Koszt położenia jednego kilometra torowiska w trudnym terenie kaszubskim wyniósł średnio 220 000 złotych. Trasa jest w pełni przystosowana do obsługi ciężkich składów węglowych o masie brutto do 1800 ton, ciągniętych przez parowozy serii Ty23."
+    },
+    "COP": {
+        "name": "Centralny Okręg Przemysłowy", 
+        "base_price": 150.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Okręg przemysłu ciężkiego o powierzchni niemal 60 000 kilometrów kwadratowych, zlokalizowany w widłach Wisły i Sanu, obejmujący powiaty województw kieleckiego, lubelskiego, krakowskiego i lwowskiego. Całkowity budżet inwestycyjny rozpisany przez Departament Budżetowy Ministerstwa Skarbu wynosi 1 miliard złotych. Struktura podzielona jest na trzy regiony: surowcowy (kielecki), wytwórczy (sandomierski) oraz konsumpcyjny (lubelski). W skład zasobów wchodzą m.in. elektrownia wodna w Rożnowie oraz liczne zakłady przetwórstwa metali."
+    },
+    "AZOT": {
+        "name": "Zakłady Azotowe Tarnów", 
+        "base_price": 60.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowa Fabryka Związków Azotowych w Mościcach pod Tarnowem, wybudowana na obszarze 620 hektarów zakupionym od rodziny Sanguszków. Koszt całej inwestycji infrastrukturalnej zamknął się w kwocie 64 milionów złotych rządu II RP. Kompleks posiada własną elektrociepłownię o mocy 30 MW, rozbudowany węzeł gazowy oraz instalacje do syntezy amoniaku według metody Fausera. Nominalna zdolność produkcyjna zakładu wynosi około 60 000 ton saletrzaku, siarczanu amonu oraz kwasu azotowego rocznie, przeznaczonych na rynek wewnętrzny."
+    },
+    "STAL": {
+        "name": "Stalowa Wola", 
+        "base_price": 100.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim. Powierzchnia hal fabrycznych i hutniczych wynosi 120 hektarów. Inwestycja finansowana jest z kredytów Funduszu Obrony Narodowej. Park maszynowy składa się z nowoczesnych tokarek importowanych z Francji oraz własnego wydziału metalurgicznego wyposażonego w piece martenowskie o pojemności 50 ton. Profil produkcyjny obejmuje odlewy staliwne, lufy artyleryjskie, blachy pancerne oraz płyty walcowane na zimno."
+    },
+    "KOLEJ": {
+        "name": "Spółki Kolejowe i Transportowe", 
+        "base_price": 120.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Ogólnokrajowa infrastruktura Polskich Kolei Państwowych (PKP) zarządzająca siecią ponad 17 000 kilometrów linii normalnotorowych. Tabor państwowy składa się z 5100 parowozów, 11 500 wagonów pasażerskich oraz około 150 000 wagonów towarowych (głównie węglarek i platform). Główny węzeł rozrządowy zlokalizowany jest w Warszawie (stacja Warszawa Główna). Oficjalna taryfa przewozowa za tonokilometr ładunku masowego wynosi średnio 0,04 złotego, a roczny wolumen przewozów towarowych oscyluje w granicach 60 milionów ton."
+    },
+    "AUTO": {
+        "name": "Państwowe Zakłady Inżynierii", 
+        "base_price": 70.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie, skupiające m.in. Fabrykę Samochodów Osobowych i Półciężarowych oraz Fabrykę Silników i Armatury w Ursusie. Zakłady posiadają wyłączne licencje na produkcję pojazdów ciężarowych i podwozi marki Fiat (modele 621 i 508), motocykli Sokół 1000 i 600 oraz ciągników gąsienicowych C7P. Zatrudnienie przekracza 6000 robotników i inżynierów. Moce montażowe linii produkcyjnej wynoszą do 3500 podwozi kołowych w skali roku."
+    },
+    "ZLOTO": {
+        "name": "Złoto", 
+        "base_price": 45.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kruszec lokacyjny stanowiący oficjalną bazę rezerw Banku Polskiego. Jeden kilogram czystego złota o próbie 900 odpowiada parytetowi określonemu w statucie banku. Zgodnie z reformą Władysława Grabskiego z kwietnia 1924 roku, parytet polskiego złotego został powiązany bezpośrednio z wartością 0,168792 grama czystego kruszcu. Zasoby fizyczne Banku Polskiego przechowywane są w skarbcach w Warszawie, a część rezerw zdeponowana jest w bankach centralnych we Francji, Wielkiej Brytanii oraz w Federal Reserve Bank w Nowym Jorku."
+    },
+    "MIEDZ": {
+        "name": "Miedź", 
+        "base_price": 20.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Metal przemysłowy o wysokiej przewodności, sprowadzany głównie drogą morską z kopalń w Chile oraz drogą kolejową z Katangi. Standardowa giełdowa jednostka rozliczeniowa to 1 tona katod miedziowych na giełdzie w Londynie (LME). W kraju surowiec przetwarzany jest przez walcownie Dziedzice oraz zakłady w Szopienicach. Cena rynkowa ustalana jest w oparciu o cenniki międzynarodowe przeliczane na złote dewizowe. Średnie zużycie krajowe na cele elektryfikacyjne wynosi około 12 000 ton rocznie."
+    },
+    "SREBRO": {
+        "name": "Srebro", 
+        "base_price": 25.0, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Kruszec o podwójnym zastosowaniu rynkowym. Wykorzystywany jako surowiec menniczy przez Mennicę Państwową w Warszawie do bicia monet obiegowych (o nominałach 2, 5 i 10 złotych z wizerunkiem Polonii lub Józefa Piłsudskiego, o próbie srebra 750). Skup i rozliczenia realizowane są w uncjach trojańskich. Krajowe zapasy pochodzą częściowo z odzysku metalurgicznego na Górnym Śląsku oraz z importu surowego srebra rafinowanego z rafinerii w Hamburgu i Londynie."
+    },
+    "USD": {
+        "name": "Dolar Amerykański", 
+        "base_price": 5.20, 
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Główna waluta rezerwowa i rozliczeniowa Stanów Zjednoczonych Ameryki, oparta na parytecie złota (zgodnie z ustawą Gold Standard Act). Przed reformą Grabskiego kurs dolara na wolnym rynku w Warszawie osiągał miliony marek polskich. Po wprowadzeniu złotego oficjalny kurs parytetowy ustalono na poziomie 5,18 złotego za 1 dolara amerykańskiego. Waluta ta służy w II RP do zabezpieczania transakcji zagranicznych oraz jako prywatny środek tezauryzacji (gromadzenia kapitału) przez obywateli."
+    }
 }
 
 prices = []
-# Przechowywanie świeczek: każda świeczka to struktura: [t, o, h, l, c]
-# Budujemy oddzielne historie dla interwałów: 5m, 1h, 1d
 candles_history = {} 
 players = {}  
 messages = []
+articles = [
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Rozpoczynamy symulację handlową opartą o uwarunkowania geopolityczne i gospodarcze państwa."}
+]
+game_state = {"current_day": 1, "player_impact": {}}
 
 def init_game():
     players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio": {}}
     players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio": {}}
     
     for symbol, data in market_assets.items():
-        prices.append({
-            "symbol": symbol,
-            "name": data["name"],
-            "price": data["base_price"],
-            "desc": data["desc"]
-        })
-        game_state["player_impact"][symbol] = 1.0 # 1.0 oznacza brak wpływu (mnożnik)
-        
-        # Inicjalizacja historii świecowej bazową ceną
+        prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"]})
+        game_state["player_impact"][symbol] = 1.0
         bp = data["base_price"]
         candles_history[symbol] = {
-            "5m": [[i, bp, bp+2, bp-2, bp+random.uniform(-1,1)] for i in range(15)],
-            "1h": [[i, bp, bp+5, bp-5, bp+random.uniform(-3,3)] for i in range(15)],
-            "1d": [[i, bp, bp+10, bp-10, bp+random.uniform(-5,5)] for i in range(15)]
+            "5m": [[i, bp, bp+0.5, bp-0.5, bp] for i in range(15)],
+            "1h": [[i, bp, bp+1, bp-1, bp] for i in range(15)],
+            "1d": [[i, bp, bp+2, bp-2, bp] for i in range(15)]
         }
 
 init_game()
@@ -97,31 +133,26 @@ def get_frontend():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     html_path = os.path.join(current_dir, "index.html")
     if os.path.exists(html_path):
-        with open(html_path, "r", encoding="utf-8") as f:
-            return f.read()
+        with open(html_path, "r", encoding="utf-8") as f: return f.read()
     return "<h1>Błąd: Brak pliku index.html</h1>"
 
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
     if cp.username in players: return {"error": "Ta nazwa jest zajęta!"}
     players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio": {}}
-    return {"status": "Zarejestrowano pomyślnie"}
+    return {"status": f"Pomyślnie utworzono profil: {cp.username}"}
 
 @app.get("/api/prices")
-def get_prices():
-    return prices
+def get_prices(): return prices
 
 @app.get("/api/candles/{symbol}/{timeframe}")
 def get_candles(symbol: str, timeframe: str):
-    # Zwraca świeczki dla wybranego symbolu i interwału (5m, 1h, 1d)
-    if symbol in candles_history and timeframe in candles_history[symbol]:
-        return candles_history[symbol][timeframe]
+    if symbol in candles_history and timeframe in candles_history[symbol]: return candles_history[symbol][timeframe]
     return []
 
 @app.get("/api/player/{username}/{password}")
 def get_player_data(username: str, password: str):
-    if username not in players or players[username]["password"] != password:
-        return {"error": "Błędny login lub hasło"}
+    if username not in players or players[username]["password"] != password: return {"error": "Błąd autoryzacji"}
     return {"balance": players[username]["balance"], "portfolio": players[username]["portfolio"], "current_day": game_state["current_day"]}
 
 @app.get("/api/ranking")
@@ -131,133 +162,143 @@ def get_ranking():
 
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
-    if tx.username not in players: return {"error": "Użytkownik nie istnieje"}
+    if tx.username not in players: return {"error": "Brak gracza"}
     player = players[tx.username]
     idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
     if idx is None: return {"error": "Brak aktywa"}
     
     asset_price = prices[idx]["price"]
-    
     if tx.type == "buy":
-        required_margin = (asset_price * tx.amount) / tx.leverage
-        if player["balance"] < required_margin: return {"error": "Masz za mało pieniędzy!"}
-        
-        player["balance"] -= required_margin
+        margin = (asset_price * tx.amount) / tx.leverage
+        if player["balance"] < margin: return {"error": "Brak wolnych środków!"}
+        player["balance"] -= margin
         player["portfolio"][tx.symbol] = player["portfolio"].get(tx.symbol, [])
         player["portfolio"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage})
-        
-        # Wpływ zakupu gracza na rynek (popyt podnosi cenę) - max 20% limitu bezpieczeństwa
-        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.001), 1.20)
-        
+        game_state["player_impact"][tx.symbol] = min(game_state["player_impact"][tx.symbol] + (tx.amount * 0.001), 1.15)
     elif tx.type == "sell":
         positions = player["portfolio"].get(tx.symbol, [])
-        total_owned = sum(pos["amount"] for pos in positions)
-        if total_owned < tx.amount: return {"error": "Nie masz tylu akcji!"}
-        
-        amount_to_remove = tx.amount
-        refund = 0
+        if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak wymaganej liczby jednostek!"}
+        amt_to_rem = tx.amount; refund = 0
         for pos in list(positions):
-            if amount_to_remove <= 0: break
-            if pos["amount"] <= amount_to_remove:
+            if amt_to_rem <= 0: break
+            if pos["amount"] <= amt_to_rem:
                 profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
-                margin = (pos["buy_price"] * pos["amount"]) / pos["leverage"]
-                refund += (margin + profit)
-                amount_to_remove -= pos["amount"]
-                positions.remove(pos)
+                refund += ((pos["buy_price"] * pos["amount"]) / pos["leverage"] + profit)
+                amt_to_rem -= pos["amount"]; positions.remove(pos)
             else:
-                profit = ((asset_price - pos["buy_price"]) * amount_to_remove) * pos["leverage"]
-                margin = (pos["buy_price"] * amount_to_remove) / pos["leverage"]
-                refund += (margin + profit)
-                pos["amount"] -= amount_to_remove
-                amount_to_remove = 0
-                
-        player["balance"] += max(refund, 0.0)
-        player["portfolio"][tx.symbol] = positions
-        
-        # Wpływ sprzedaży gracza na rynek (podaż obniża cenę) - min 20% spadek limitu bezpieczeństwa
-        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.001), 0.80)
-
+                profit = ((asset_price - pos["buy_price"]) * amt_to_rem) * pos["leverage"]
+                refund += ((pos["buy_price"] * amt_to_rem) / pos["leverage"] + profit)
+                pos["amount"] -= amt_to_rem; amt_to_rem = 0
+        player["balance"] += max(refund, 0.0); player["portfolio"][tx.symbol] = positions
+        game_state["player_impact"][tx.symbol] = max(game_state["player_impact"][tx.symbol] - (tx.amount * 0.001), 0.85)
     return {"status": "ok"}
 
 @app.post("/api/admin/money")
 def admin_add_money(data: AddMoney):
     if data.username in players:
         players[data.username]["balance"] += data.amount
-        return {"status": f"Dodano {data.amount} zł"}
+        return {"status": f"Przyznano {data.amount} zł"}
     return {"error": "Brak gracza"}
 
-@app.post("/api/admin/trend")
-def admin_set_trend(data: SetTrend):
-    game_state["admin_trends"][data.symbol] = data.trend
-    return {"status": "Trend zmieniony"}
+@app.post("/api/admin/change-percent")
+def admin_change_percent(data: SetPercentChange):
+    idx = next((i for i, p in enumerate(prices) if p["symbol"] == data.symbol), None)
+    if idx is not None:
+        multiplier = 1 + (data.percent / 100.0)
+        prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 2)
+        return {"status": f"Zmieniono cenę {data.symbol} o {data.percent}%"}
+    return {"error": "Brak aktywa"}
+
+@app.post("/api/admin/article")
+def admin_add_article(art: Article):
+    articles.append({"title": art.title, "content": art.content})
+    return {"status": "Artykuł opublikowany"}
 
 @app.post("/api/admin/next-day")
 def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
         return {"status": f"Dzień {game_state['current_day']}"}
-    return {"error": "Koniec gry"}
+    return {"error": "Maksymalny dzień osiągnięty"}
 
 @app.get("/api/messages")
 def get_messages(): return messages[-30:]
 
 @app.post("/api/messages")
 def add_message(msg: Message):
-    messages.append(msg)
-    return {"status": "ok"}
+    messages.append(msg); return {"status": "ok"}
 
-# ---------------- GENERATOR ŚWIECZEK I RYNKU PRO ----------------
+@app.get("/api/articles")
+def get_articles(): return articles
+
+# ---------------- PRECYZYJNY SILNIK AKUMULACJI CEN (ZAKUMULOWANY TREND) ----------------
 def market_engine():
     tick_count = 15
     while True:
-        time.sleep(4) # Odświeżenie rynku co 4 sekundy
+        time.sleep(4)
         tick_count += 1
+        day = game_state["current_day"]
         
         for p in prices:
             sym = p["symbol"]
             open_p = p["price"]
             
-            # 1. Losowy ruch bazy
-            change = random.uniform(-0.012, 0.012)
+            history_trend = 0.0
             
-            # 2. Wpływ historyczny dni obozu
-            day = game_state["current_day"]
-            if sym == "PORT" and day > 3: change += 0.003
-            if sym == "COP" and day < 6: change -= 0.005
-            if sym == "COP" and day >= 6: change += 0.009
-            if sym == "STAL" and day > 8: change += 0.005
+            # Skorelowane punkty zwrotne prosto z tabel
+            if day <= 4:
+                if sym == "USD": history_trend = 0.024
+                if sym in ["COP", "STAL", "AZOT"]: history_trend = -0.005
+                if sym == "PORT": history_trend = 0.006
+            elif day == 5:
+                if sym == "USD": history_trend = -0.06
+                if sym in ["PORT", "KOLEJ"]: history_trend = 0.018
+            elif day == 6:
+                if sym == "USD": history_trend = 0.03
+                if sym == "MIEDZ": history_trend = 0.014
+            elif day in [7, 8, 9]:
+                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.016
+                if sym == "AUTO": history_trend = 0.018
+                if sym == "AZOT": history_trend = 0.014
+                if sym in ["MIEDZ", "SREBRO"]: history_trend = 0.007
+                if sym == "USD": history_trend = -0.001
+            elif day in [10, 11, 12]:
+                if sym in ["SREBRO", "MIEDZ", "AUTO"]: history_trend = -0.035
+                if sym == "ZLOTO": history_trend = 0.022
+                if sym in ["PORT", "MAGI"]: history_trend = 0.004
+            elif day == 13:
+                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.026
+                if sym == "ZLOTO": history_trend = -0.012
+            elif day == 14:
+                if sym == "ZLOTO": history_trend = 0.035
+                if sym in ["MIEDZ", "AUTO"]: history_trend = 0.01
+            elif day == 15:
+                if sym in ["COP", "STAL"]: history_trend = 0.05
+                if sym in ["MIEDZ", "KOLEJ", "AUTO"]: history_trend = 0.018
+
+            market_noise = random.uniform(-0.01, 0.01)
+            total_change = (history_trend * 0.6) + (market_noise * 0.4)
+            total_change += (game_state["player_impact"][sym] - 1.0) * 0.05
             
-            # 3. Wpływ administratora
-            if sym in game_state["admin_trends"]:
-                change += game_state["admin_trends"][sym]
+            # Twardy bezpiecznik 10%
+            if total_change > 0.10: total_change = 0.10
+            if total_change < -0.10: total_change = -0.10
             
-            # Obliczenie ceny bazowej po trendach
-            base_calculated_price = open_p * (1 + change)
+            close_p = round(max(open_p * (1 + total_change), 0.02), 2)
+            p["price"] = close_p
             
-            # 4. ZASTOSOWANIE LIMITU WPŁYWU GRACZY (Maksymalnie od 0.80x do 1.20x ceny bazowej, czyli max 20%)
-            impact_modifier = game_state["player_impact"][sym]
-            final_price = round(max(base_calculated_price * impact_modifier, 0.1), 2)
+            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.01), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.01), 0.01), 2)
             
-            p["price"] = final_price
-            close_p = final_price
-            
-            # Tworzenie sztucznych wartości High/Low dla świecy w danym tiku
-            high_p = round(max(open_p, close_p) + random.uniform(0, 2), 2)
-            low_p = round(min(open_p, close_p) - random.uniform(0, 2), 2)
-            
-            # Aktualizacja historii świecowej dla trzech ram czasowych (Timeframes)
             for tf in ["5m", "1h", "1d"]:
                 hist = candles_history[sym][tf]
-                # Co parę sekund symulujemy zamknięcie starej świecy i otwarcie nowej
-                if tick_count % 5 == 0 or len(hist) == 0:
+                if tick_count % 4 == 0 or len(hist) == 0:
                     hist.append([tick_count, open_p, high_p, low_p, close_p])
                 else:
-                    # Aktualizujemy ostatnią świecę na żywo
                     last = hist[-1]
-                    last[2] = max(last[2], high_p) # nowy High
-                    last[3] = min(last[3], low_p)  # nowy Low
-                    last[4] = close_p             # nowy Close
-                
-                if len(hist) > 25: hist.shift()
+                    last[2] = max(last[2], high_p)
+                    last[3] = min(last[3], low_p)
+                    last[4] = close_p
+                if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
 
 threading.Thread(target=market_engine, daemon=True).start()

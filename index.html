@@ -29,7 +29,7 @@
         .asset-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .symbol { font-size: 16px; font-weight: bold; color: var(--khaki); }
         .price { font-size: 17px; color: var(--gold); font-weight: bold; }
-        .desc { font-size: 12px; color: #ccc; margin: 6px 0; display: none; background: #050705; padding: 8px; border-radius: 4px; border: 1px solid #222; line-height: 1.4; }
+        .desc { font-size: 12.5px; color: #cedecd; margin: 6px 0; display: none; background: #050705; padding: 10px; border-radius: 4px; border: 1px solid #243324; line-height: 1.5; text-align: justify; }
         
         .tf-btn { background: #182017; color: #888; padding: 4px 10px; font-size: 11px; border-radius: 4px; width: auto; display: inline-block; margin: 2px; border: 1px solid #273426; }
         .tf-btn.active { background: var(--khaki); color: black; font-weight: bold; }
@@ -37,10 +37,10 @@
         .canvas-container { width: 100%; height: 180px; margin-top: 6px; background: #000; border-radius: 4px; position: relative; border: 1px solid #1c251c; padding-right: 55px; padding-bottom: 22px; }
         canvas { width: 100%; height: 100%; display: block; }
         
-        #chatBox, #newsBox { height: 140px; overflow-y: auto; background: #050705; padding: 8px; font-size: 13px; border-radius: 4px; margin-bottom: 5px; border: 1px solid #212b21; }
-        .news-article { border-bottom: 1px solid #223022; padding-bottom: 6px; margin-bottom: 6px; }
+        #chatBox, #newsBox { height: 160px; overflow-y: auto; background: #050705; padding: 8px; font-size: 13px; border-radius: 4px; margin-bottom: 5px; border: 1px solid #212b21; }
+        .news-article { border-bottom: 1px solid #223022; padding-bottom: 8px; margin-bottom: 8px; }
         .news-title { font-weight: bold; color: var(--gold); font-size: 14px; }
-        .news-content { font-size: 12px; color: #ddd; margin-top: 2px; }
+        .news-content { font-size: 12px; color: #ddd; margin-top: 3px; line-height: 1.4; }
         
         .badge { background: var(--red); padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: bold; color: white; }
         #adminPanel { display: none; border: 2px solid var(--red); background: #1f1212; }
@@ -82,18 +82,19 @@
                 <button onclick="adminGiveCash()" style="background:var(--green); width:25%;">ZASIL</button>
             </div>
 
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📢 PUBLIKACJA OFICJALNEGO ARTYKUŁU / ANALIZY:</label>
-            <input id="artTitle" placeholder="Tytuł artykułu (np. Opinia Ekspertów Lewantu, Wyzwanie Finansowe)">
-            <textarea id="artContent" rows="2" placeholder="Treść komunikatu rynkowego, wyzwania lub prognozy politycznej..."></textarea>
-            <button onclick="adminPublishArticle()" style="background:var(--gold); color:black; font-weight:bold;">OPUBLIKUJ ARTYKUŁ RYNKOWY</button>
+            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📢 PUBLIKACJA ARTYKUŁU / ANALIZY EKSPERCKIEJ:</label>
+            <input id="artTitle" placeholder="Tytuł artykułu (np. Kryzys w USA, Opinia Ekspertów)">
+            <textarea id="artContent" rows="2" placeholder="Treść komunikatu rynkowego, prognozy politycznej..."></textarea>
+            <button onclick="adminPublishArticle()" style="background:var(--gold); color:black; font-weight:bold;">OPUBLIKUJ NOWY ARTYKUŁ</button>
 
-            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📈 INTERWENCJA WALUTOWO-KURSOWA:</label>
-            <select id="admAsset" style="margin-top:2px;"></select>
+            <label style="font-size:11px; color:#ffb0b0; font-weight:bold; margin-top:8px; display:block;">📈 DOWOLNA RĘCZNA INTERWENCJA PROCENTOWA (%):</label>
             <div class="flex-row">
-                <button onclick="adminTrend(-0.05)" style="background:var(--red); color:white;">WYMUSZ SPADEK (-5%)</button>
-                <button onclick="adminTrend(0.05)" style="background:var(--green); color:white;">WYMUSZ WZROST (+5%)</button>
+                <select id="admAsset" style="width:40%; margin:0;"></select>
+                <input id="admPercent" type="number" placeholder="Wpisz % (np. 15 lub -20)" style="width:35%; margin:0;">
+                <button onclick="adminExecutePercentChange()" style="background:var(--green); color:black; width:25%; margin:0;">ZMIEŃ %</button>
             </div>
-            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:10px; font-size:15px;">⏳ PRZEWIŃ DO NASTĘPNEGO DNIA OBOZU</button>
+            
+            <button onclick="adminNextDay()" style="background:#d35400; color:white; margin-top:15px; font-size:15px;">⏳ PRZEWIŃ DO NASTĘPNEGO ONTOWEGO DNIA</button>
         </div>
 
         <div class="card">
@@ -102,7 +103,7 @@
         </div>
 
         <div class="card">
-            <h3>📈 AKTYWA RYNKOWE II RP</h3>
+            <h3>📈 AKTYWA RYNKOWE II RP (Kliknij aktywo, by rozwinąć Memorandum)</h3>
             <div id="marketList"></div>
         </div>
 
@@ -228,7 +229,6 @@ async function initMarketHTML() {
     });
 }
 
-// PROFESJONALNY SYSTEM RENDEROWANIA ŚWIEC Z ZAKODOWANĄ OSIĄ CENOWĄ (Y) I CZASOWĄ (X)
 async function drawCandles(symbol) {
     const canvas = document.getElementById(`canvas-${symbol}`);
     if (!canvas) return;
@@ -358,7 +358,9 @@ async function loadArticles() {
     const data = await res.json();
     const box = document.getElementById("newsBox");
     box.innerHTML = "";
-    data.reverse().forEach(a => {
+    
+    const articlesCopy = [...data];
+    articlesCopy.reverse().forEach(a => {
         box.innerHTML += `
             <div class="news-article">
                 <div class="news-title">📰 ${a.title}</div>
@@ -378,7 +380,22 @@ async function adminPublishArticle() {
     });
     document.getElementById("artTitle").value = "";
     document.getElementById("artContent").value = "";
-    loadArticles();
+    await loadArticles();
+}
+
+async function adminExecutePercentChange() {
+    const sym = document.getElementById("admAsset").value;
+    const pct = parseFloat(document.getElementById("admPercent").value);
+    if(isNaN(pct)) return alert("Wpisz poprawną wartość procentową!");
+    
+    const res = await fetch(`${API_URL}/api/admin/change-percent`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ symbol: sym, percent: pct })
+    });
+    const d = await res.json();
+    alert(d.status || d.error);
+    document.getElementById("admPercent").value = "";
+    updateGameData();
 }
 
 async function executeTrade(type) {
@@ -424,15 +441,6 @@ async function adminGiveCash() {
     const d = await res.json(); alert(d.status || d.error); updateGameData();
 }
 
-async function adminTrend(val) {
-    const sym = document.getElementById("admAsset").value;
-    await fetch(`${API_URL}/api/admin/trend`, {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ symbol: sym, trend: val })
-    });
-    alert("Interwencja kursowa została zlecona pomyślnie.");
-}
-
 async function adminNextDay() {
     const res = await fetch(`${API_URL}/api/admin/next-day`, {method: "POST"});
     const d = await res.json(); alert(d.status || d.error); updateGameData();
@@ -443,7 +451,7 @@ async function startCycles() {
     updateGameData(); loadChat(); loadArticles();
     setInterval(updateGameData, 4000);
     setInterval(loadChat, 3000);
-    setInterval(loadArticles, 5000);
+    setInterval(loadArticles, 4000);
 }
 </script>
 </body>
