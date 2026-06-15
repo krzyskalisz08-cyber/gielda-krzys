@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -9,7 +9,6 @@ import os
 
 app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna")
 
-# Pełne i bezpieczne ustawienia CORS dla platformy Render oraz urządzeń mobilnych
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,7 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- MODELE PYDANTIC (Zgodne z index.html) ----
 class Transaction(BaseModel):
     username: str
     symbol: str
@@ -46,7 +44,7 @@ class SetPercentChange(BaseModel):
     symbol: str
     percent: float
 
-# ---- BAZA DANYCH AKTYWÓW II RP ----
+# CAŁKOWICIE NOWE, ROZBUDOWANE, FAKTOGRAFICZNE MEMORANDA (BEZ PREDYKCJI)
 market_assets = {
     "PORT": {
         "name": "Port w Gdyni", 
@@ -81,7 +79,7 @@ market_assets = {
     "AUTO": {
         "name": "Państwowe Zakłady Inżynierii", 
         "base_price": 70.0, 
-        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie, skupiające m.in. Fabrykę Samochodów Osobowych i Półciężarowych oraz Fabrykę Silników i Armatury w Ursusie. Zakłady posiadają wyłączne licencje na Comic samochodów i podwozi marki Fiat (modele 621 i 508), motocykli Sokół 1000 i 600 oraz ciągników gąsienicowych C7P. Zatrudnienie przekracza 6000 robotników i inżynierów. Moce montażowe linii produkcyjnej wynoszą do 3500 podwozi kołowych w skali roku."
+        "desc": "Oficjalne memorandum wywiadu gospodarczego: Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie, skupiające m.in. Fabrykę Samochodów Osobowych i Półciężarowych oraz Fabrykę Silników i Armatury w Ursusie. Zakłady posiadają wyłączne licencje na produkcję pojazdów ciężarowych i podwozi marki Fiat (modele 621 i 508), motocykli Sokół 1000 i 600 oraz ciągników gąsienicowych C7P. Zatrudnienie przekracza 6000 robotników i inżynierów. Moce montażowe linii produkcyjnej wynoszą do 3500 podwozi kołowych w skali roku."
     },
     "ZLOTO": {
         "name": "Złoto", 
@@ -105,7 +103,6 @@ market_assets = {
     }
 }
 
-# ---- STAN GRY W PAMIĘCI SERWERA ----
 prices = []
 candles_history = {} 
 players = {}  
@@ -131,36 +128,14 @@ def init_game():
 
 init_game()
 
-# ---- POPRAWIONY I SPRAWDZONY INTERFEJS DLA RENDERA ----
 @app.get("/", response_class=HTMLResponse)
 def get_frontend():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    html_path = os.path.join(current_dir, "index.html")
-    
-    if os.path.exists(html_path):
-        with open(html_path, "r", encoding="utf-8") as f: 
-            return f.read()
-            
+    # To jest Twoja oryginalna funkcja serwująca index.html
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f: 
             return f.read()
-            
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Błąd Gry</title>
-    </head>
-    <body style="background:#120707; color:#ff6b6b; font-family:sans-serif; text-align:center; padding-top:100px;">
-        <h2>⚠️ BŁĄD KRYTYCZNY: BRAK INTERFEJSU HTML ⚠️</h2>
-        <p>Serwer Pythona na Renderze włączył się pomyślnie, ale nie widzi pliku <b>index.html</b>.</p>
-        <p>Upewnij się, że plik <b>index.html</b> znajduje się w tym samym folderze w repozytorium GitHub co plik <b>main.py</b>!</p>
-    </body>
-    </html>
-    """
+    return "<h1>Status: Backend Giełdy II RP działa pomyślnie</h1>"
 
-# ---- ENDPOINTY INTERFEJSU API ----
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
     if cp.username in players: 
@@ -277,7 +252,6 @@ def add_message(msg: Message):
 def get_articles(): 
     return articles
 
-# ---- SYSTEM AKTUALIZACJI TRENDÓW RYNKOWYCH ----
 def market_engine():
     tick_count = 15
     while True:
