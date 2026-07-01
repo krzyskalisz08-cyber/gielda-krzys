@@ -74,6 +74,28 @@ def save_data(key, data):
     except Exception as e:
         print(f"[❌ DB WRITE ERROR] Problem z zapisem klucza '{key}' do chmury: {e}")
 
+def save_data_batch(batch_dict):
+    """Zapisuje wiele kluczy jednocześnie przy użyciu tylko jednego połączenia z bazą (Ochrona przed limitami Neona)"""
+    if not DATABASE_URL:
+        for key, data in batch_dict.items():
+            save_data(key, data)
+        return
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        for key, data in batch_dict.items():
+            cur.execute("""
+                INSERT INTO gielda_cloud_store (key, value)
+                VALUES (%s, %s)
+                ON CONFLICT (key)
+                DO UPDATE SET value = EXCLUDED.value;
+            """, (key, Json(data)))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[❌ DB BATCH WRITE ERROR] Problem z zapisem pakietu danych do chmury: {e}")
+
 def load_data(key, default_value):
     if not DATABASE_URL:
         # Odczyt lokalny
@@ -95,7 +117,11 @@ def load_data(key, default_value):
         cur.close()
         conn.close()
         if row:
-            return row[0]
+            val = row[0]
+            # Zabezpieczenie na wypadek, gdyby baza zwróciła surowy string zamiast obiektu
+            if isinstance(val, str):
+                return json.loads(val)
+            return val
     except Exception as e:
         print(f"[❌ DB READ ERROR] Problem z odczytem klucza '{key}' z chmury: {e}")
     return default_value
@@ -490,16 +516,18 @@ def market_engine():
                                 positions.remove(pos)
                                 messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} zlikwidowana."})
 
-                # Zapis i log co 5 sekund
+                # Zapis i log co 5 sekund za pomocą zoptymalizowanego zapisu zbiorczego (Batch)
                 if tick_count % 5 == 0:
                     test_usd = next((p["price"] for p in prices if p["symbol"] == "USD"), 0.0)
                     print(f"[⚙️ DB LIVE] Tick: {tick_count} | USD: {test_usd}")
                     
-                    save_data("prices", prices)
-                    save_data("candles", candles_history)
-                    save_data("messages", messages)
-                    save_data("gamestate", game_state)
-                    save_data("players", players)
+                    save_data_batch({
+                        "prices": prices,
+                        "candles": candles_history,
+                        "messages": messages,
+                        "gamestate": game_state,
+                        "players": players
+                    })
                     
         except Exception as e:
             print(f"⚠️ [BLOKADA CRASH] Silnik przechwycił błąd i żyje dalej: {e}")
