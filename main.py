@@ -193,7 +193,7 @@ messages = load_data("messages", [])
 articles = load_data("articles", [
     {"title": "Otwarcie Rynku z Chmurą PostgreSQL", "content": "Gra została pomyślnie połączona z trwałą zewnętrzną bazą danych."}
 ])
-game_state = load_data("gamestate", {"current_day": 1, "player_trend_impulse": {}})
+game_state = load_data("gamestate", {"current_day": 1})
 
 def init_game():
     global players, prices, candles_history, game_state
@@ -202,10 +202,9 @@ def init_game():
         players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
         save_data("players", players)
         
-    if not prices or not candles_history or "player_trend_impulse" not in game_state or not game_state["player_trend_impulse"]:
+    if not prices or not candles_history:
         prices = []
         candles_history = {}
-        game_state["player_trend_impulse"] = {}
         
         for symbol, data in market_assets.items():
             prices.append({
@@ -216,7 +215,6 @@ def init_game():
                 "desc": data["desc"], 
                 "daily_change": 0.0
             })
-            game_state["player_trend_impulse"][symbol] = 0.0
             candles_history[symbol] = {"5m": [], "1h": [], "1d": []}
             
         save_data("prices", prices)
@@ -267,7 +265,7 @@ def get_player_data(username: str, password: str):
             "balance": players[username]["balance"], 
             "portfolio_long": players[username].get("portfolio_long", {}), 
             "portfolio_short": players[username].get("portfolio_short", {}), 
-            "current_day": game_state["current_day"]
+            "current_day": game_state.get("current_day", 1)
         }
 
 # ---- NOWY ENDPOINT: RANKING ZASTĘPÓW ----
@@ -337,7 +335,6 @@ def process_transaction(tx: Transaction):
         if idx is None: return {"error": "Brak aktywa"}
         
         asset_price = prices[idx]["price"]
-        market_cap_reference = 500000.0 
         trade_value = tx.amount * asset_price
         
         # ---- KUPNO LONG ----
@@ -347,8 +344,6 @@ def process_transaction(tx: Transaction):
             player["balance"] -= margin
             player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
             player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
-            impact = (trade_value / market_cap_reference) * 0.15
-            game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
             
         # ---- SPRZEDAŻ LONG ----
         elif tx.type == "sell_long":
@@ -373,8 +368,6 @@ def process_transaction(tx: Transaction):
                     amt_to_rem = 0
             player["balance"] += max(refund, 0.0)
             player["portfolio_long"][tx.symbol] = positions
-            impact = (trade_value / market_cap_reference) * 0.15
-            game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
         # ---- OTWARCIE SHORT ----
         elif tx.type == "open_short":
@@ -383,8 +376,6 @@ def process_transaction(tx: Transaction):
             player["balance"] -= margin
             player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
             player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
-            impact = (trade_value / market_cap_reference) * 0.15
-            game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
         # ---- ZAMKNIĘCIE SHORT ----
         elif tx.type == "close_short":
@@ -409,11 +400,8 @@ def process_transaction(tx: Transaction):
                     amt_to_rem = 0
             player["balance"] += max(refund, 0.0)
             player["portfolio_short"][tx.symbol] = positions
-            impact = (trade_value / market_cap_reference) * 0.15
-            game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
             
         save_data("players", players)
-        save_data("gamestate", game_state)
         return {"status": "ok"}
 
 @app.post("/api/admin/money")
@@ -439,8 +427,8 @@ def admin_change_percent(data: SetPercentChange):
 @app.post("/api/admin/next-day")
 def next_day():
     with data_lock:
-        if game_state["current_day"] < 15:
-            game_state["current_day"] += 1
+        if game_state.get("current_day", 1) < 15:
+            game_state["current_day"] = game_state.get("current_day", 1) + 1
             for p in prices:
                 p["day_open_price"] = p["price"]
             save_data("prices", prices)
@@ -505,16 +493,15 @@ def market_engine():
                     history_trend = current_day_trends.get(sym, 0.0)
                     tick_history_change = history_trend / TICKS_PER_DAY
                     
-                    player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
-                    tick_player_change = player_impulse / 600.0
-                    
                     tick_bot_change = 0.0
                     if sym in bot_active_assets:
                         bot_direction = random.choice([-1, 1])
                         tick_bot_change = bot_direction * (0.03 / TICKS_PER_DAY)
                     
                     market_noise = random.uniform(-0.00001, 0.00001)
-                    total_tick_change = tick_history_change + tick_player_change + tick_bot_change + market_noise
+                    
+                    # Wpływ wyłącznie z zaplanowanych trendów, botów i minimalnego szumu
+                    total_tick_change = tick_history_change + tick_bot_change + market_noise
                     
                     if total_tick_change > 0.002: total_tick_change = 0.002
                     if total_tick_change < -0.002: total_tick_change = -0.002
@@ -525,9 +512,6 @@ def market_engine():
                     day_open = p.get("day_open_price", open_p)
                     if day_open <= 0: day_open = 0.01 
                     p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
-                    
-                    if sym in game_state.get("player_trend_impulse", {}):
-                        game_state["player_trend_impulse"][sym] *= 0.995
                     
                     high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
                     low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
