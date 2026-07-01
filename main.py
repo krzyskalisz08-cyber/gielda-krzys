@@ -49,22 +49,43 @@ class SetPercentChange(BaseModel):
 class DeletePlayer(BaseModel):
     username: str
 
-# ---- STATYCZNA BAZA AKTYWÓW ----
+# ---- BAZA AKTYWÓW ----
 market_assets = {
-    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Kompleks portowy zlokalizowany nad Zatoką Gdańską. Budowa rozpoczęta na mocy ustawy z dnia 23 września 1922 roku."},
-    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Magistrala kolejowa Herby Nowe – Gdynia, oznaczona jako linia numer 201. Całkowita długość wynosi dokładnie 452 km."},
-    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "Okręg przemysłu ciężkiego o powierzchni niemal 60 000 kilometrów kwadratowych, zlokalizowany w widłach Wisły i Sanu."},
-    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "Państwowa Fabryka Związków Azotowych w Mościcach pod Tarnowem, wybudowana na obszarze 620 hektarów."},
-    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady Południowe zlokalizowane w nowo powstającym mieście Stalowa Wola w województwie lwowskim."},
-    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "Ogólnokrajowa infrastruktura Polskich Kolei Państwowych (PKP) zarządzająca sieciam ponad 17 000 km linii."},
-    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "Państwowe Zakłady Inżynierii (PZInż) z siedzibą przy ulicy Terespolskiej w Warszawie."},
-    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Kruszec lokacyjny stanowiący oficjalną bazę rezerw Banku Polskiego. Powiązany z reformą Grabskiego."},
-    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal przemysłowy o wysokiej przewodności, sprowadzany głównie drogą morską ze względu na zapotrzebowanie elektryfikacji."},
-    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Kruszec o podwójnym zastosowaniu rynkowym. Wykorzystywany jako surowiec menniczy przez Mennicę Państwową."},
-    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa i rozliczeniowa Stanów Zjednoczonych Ameryki, oparta na parytecie złota."}
+    "PORT": {"name": "Port w Gdyni", "base_price": 100.0, "desc": "Kompleks portowy nad Zatoką Gdańską."},
+    "MAGI": {"name": "Magistrala Śląsk-Gdynia", "base_price": 80.0, "desc": "Magistrala kolejowa Herby Nowe – Gdynia, linia 201."},
+    "COP": {"name": "Centralny Okręg Przemysłowy", "base_price": 150.0, "desc": "Okręg przemysłu ciężkiego w widłach Wisły i Sanu."},
+    "AZOT": {"name": "Zakłady Azotowe Tarnów", "base_price": 60.0, "desc": "Państwowa Fabryka Związków Azotowych w Mościcach."},
+    "STAL": {"name": "Stalowa Wola", "base_price": 100.0, "desc": "Zakłady Południowe w nowo powstającym mieście."},
+    "KOLEJ": {"name": "Spółki Kolejowe i Transportowe", "base_price": 120.0, "desc": "Infrastruktura Polskich Kolei Państwowych (PKP)."},
+    "AUTO": {"name": "Państwowe Zakłady Inżynierii", "base_price": 70.0, "desc": "Zakłady PZInż z siedzibą w Warszawie."},
+    "ZLOTO": {"name": "Złoto", "base_price": 45.0, "desc": "Kruszec lokacyjny, baza rezerw Banku Polskiego."},
+    "MIEDZ": {"name": "Miedź", "base_price": 20.0, "desc": "Metal przemysłowy niezbędny do elektryfikacji kraju."},
+    "SREBRO": {"name": "Srebro", "base_price": 25.0, "desc": "Kruszec o podwójnym zastosowaniu rynkowym i menniczym."},
+    "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa oparta na parytecie złota."}
 }
 
-# ---- FUNKCJE ZAPISU I ODCZYTU Z PLIKÓW JSON ----
+# ---- MAPA TRENDÓW DOBOWYCH (3X SILNIEJSZE, ZRÓŻNICOWANE) ----
+# Wartości reprezentują docelowy trend dobowy dla danego dnia. 
+# Żadne dwie spółki nie poruszają się w tym samym tempie.
+MARKET_TRENDS = {
+    1: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.009, "COP": -0.012, "STAL": -0.018, "AZOT": -0.015, "KOLEJ": -0.003, "AUTO": -0.006, "ZLOTO": 0.006, "MIEDZ": -0.009, "SREBRO": -0.006},
+    2: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.012, "COP": -0.015, "STAL": -0.012, "AZOT": -0.018, "KOLEJ": -0.006, "AUTO": -0.003, "ZLOTO": 0.009, "MIEDZ": -0.006, "SREBRO": -0.009},
+    3: {"USD": 0.072, "PORT": 0.015, "MAGI": 0.015, "COP": -0.018, "STAL": -0.015, "AZOT": -0.012, "KOLEJ": -0.009, "AUTO": -0.009, "ZLOTO": 0.003, "MIEDZ": -0.012, "SREBRO": -0.003},
+    4: {"USD": 0.072, "PORT": 0.021, "MAGI": 0.006, "COP": -0.009, "STAL": -0.021, "AZOT": -0.015, "KOLEJ": -0.003, "AUTO": -0.012, "ZLOTO": 0.006, "MIEDZ": -0.006, "SREBRO": -0.006},
+    5: {"USD": -0.180, "PORT": 0.056, "KOLEJ": 0.050, "MAGI": 0.042, "COP": 0.012, "STAL": 0.015, "AZOT": 0.009, "AUTO": 0.018, "ZLOTO": -0.036, "MIEDZ": 0.024, "SREBRO": 0.018},
+    6: {"USD": 0.090, "MIEDZ": 0.042, "SREBRO": 0.030, "ZLOTO": 0.015, "PORT": -0.012, "MAGI": -0.009, "KOLEJ": -0.006, "COP": 0.018, "STAL": 0.021, "AZOT": 0.012, "AUTO": 0.024},
+    7: {"PORT": 0.046, "MAGI": 0.052, "KOLEJ": 0.048, "AUTO": 0.054, "AZOT": 0.042, "MIEDZ": 0.024, "SREBRO": 0.018, "COP": 0.036, "STAL": 0.039, "ZLOTO": -0.024, "USD": -0.015},
+    8: {"PORT": 0.048, "MAGI": 0.046, "KOLEJ": 0.052, "AUTO": 0.050, "AZOT": 0.045, "MIEDZ": 0.018, "SREBRO": 0.024, "COP": 0.042, "STAL": 0.033, "ZLOTO": -0.021, "USD": -0.018},
+    9: {"PORT": 0.050, "MAGI": 0.050, "KOLEJ": 0.044, "AUTO": 0.058, "AZOT": 0.039, "MIEDZ": 0.021, "SREBRO": 0.021, "COP": 0.030, "STAL": 0.045, "ZLOTO": -0.027, "USD": -0.012},
+    10: {"SREBRO": -0.110, "MIEDZ": -0.095, "AUTO": -0.100, "ZLOTO": 0.066, "USD": 0.045, "PORT": -0.030, "MAGI": -0.024, "KOLEJ": -0.018, "COP": -0.042, "STAL": -0.048, "AZOT": -0.036},
+    11: {"SREBRO": -0.100, "MIEDZ": -0.110, "AUTO": -0.105, "ZLOTO": 0.066, "USD": 0.042, "PORT": -0.024, "MAGI": -0.030, "KOLEJ": -0.015, "COP": -0.048, "STAL": -0.039, "AZOT": -0.042},
+    12: {"SREBRO": -0.105, "MIEDZ": -0.100, "AUTO": -0.110, "ZLOTO": 0.066, "USD": 0.048, "PORT": -0.036, "MAGI": -0.018, "KOLEJ": -0.021, "COP": -0.036, "STAL": -0.045, "AZOT": -0.030},
+    13: {"PORT": 0.082, "MAGI": 0.074, "KOLEJ": 0.078, "AUTO": 0.036, "COP": 0.042, "STAL": 0.045, "AZOT": 0.030, "MIEDZ": 0.024, "SREBRO": 0.018, "ZLOTO": -0.045, "USD": -0.030},
+    14: {"ZLOTO": 0.105, "MIEDZ": 0.034, "AUTO": 0.026, "SREBRO": 0.048, "USD": 0.060, "PORT": -0.015, "MAGI": -0.012, "KOLEJ": -0.009, "COP": 0.018, "STAL": 0.024, "AZOT": 0.015},
+    15: {"COP": 0.160, "STAL": 0.140, "MIEDZ": 0.058, "KOLEJ": 0.050, "AUTO": 0.054, "PORT": 0.042, "MAGI": 0.036, "AZOT": 0.048, "ZLOTO": -0.060, "SREBRO": 0.030, "USD": -0.045}
+}
+
+# ---- POMOCNICZE FUNKCJE PERSYSTENCJI ----
 def save_json(filename, data):
     try:
         with open(filename, "w", encoding="utf-8") as f:
@@ -81,26 +102,23 @@ def load_json(filename, default_value):
             print(f"Błąd odczytu pliku {filename}: {e}")
     return default_value
 
-# ---- INICJALIZACJA ZMIENNYCH GLOBALNYCH Z PLIKÓW (LUB DOMYŚLNYCH) ----
+# ---- INICJALIZACJA STANU GRY ----
 players = load_json("players.json", {})
 prices = load_json("prices.json", [])
 candles_history = load_json("candles.json", {})
 messages = load_json("messages.json", [])
 articles = load_json("articles.json", [
-    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Wprowadzono twarde limity salda oraz automatyczny mechanizm Margin Call chroniący przed debetami."}
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Wdrożono nowy, dynamiczny i gwałtowny silnik giełdowy o ograniczeniu do 5% na tick."}
 ])
 game_state = load_json("gamestate.json", {"current_day": 1, "player_trend_impulse": {}})
 
 def init_game():
     global players, prices, candles_history, game_state
-    
-    # Jeśli plik graczy był pusty, stwórz domyślnych
     if not players:
         players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio_long": {}, "portfolio_short": {}}
         players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
         save_json("players.json", players)
         
-    # Jeśli stan rynku był pusty, wygeneruj go od zera
     if not prices or not candles_history or "player_trend_impulse" not in game_state or not game_state["player_trend_impulse"]:
         prices = []
         candles_history = {}
@@ -123,7 +141,6 @@ def init_game():
 init_game()
 
 # ---- ENDPOINTY API ----
-
 @app.get("/", response_class=HTMLResponse)
 def get_frontend():
     if os.path.exists("index.html"):
@@ -166,48 +183,43 @@ def admin_get_players():
 
 @app.post("/api/admin/delete-player")
 def admin_delete_player(dp: DeletePlayer):
-    if dp.username == "admin":
-        return {"error": "Nie można usunąć konta głównego administratora!"}
+    if dp.username == "admin": return {"error": "Nie można usunąć administratora!"}
     if dp.username in players:
         del players[dp.username]
         save_json("players.json", players)
-        return {"status": f"Pomyślnie usunięto patrol/gracza: {dp.username}"}
-    return {"error": "Nie znaleziono podanego gracza."}
+        return {"status": f"Usunięto gracza: {dp.username}"}
+    return {"error": "Nie znaleziono gracza."}
 
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
-    if tx.username not in players: 
-        return {"error": "Brak gracza"}
+    if tx.username not in players: return {"error": "Brak gracza"}
     player = players[tx.username]
     
     if "portfolio_long" not in player: player["portfolio_long"] = {}
     if "portfolio_short" not in player: player["portfolio_short"] = {}
 
     idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
-    if idx is None: 
-        return {"error": "Brak aktywa"}
+    if idx is None: return {"error": "Brak aktywa"}
     
     asset_price = prices[idx]["price"]
     market_cap_reference = 500000.0 
     trade_value = tx.amount * asset_price
     
-    # ---- 1. KUPNO POZYCJI DŁUGIEJ (LONG) ----
+    # ---- KUPNO LONG ----
     if tx.type == "buy_long":
         margin = trade_value / tx.leverage
-        if player["balance"] < margin: 
-            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
+        if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
         player["balance"] -= margin
         player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
         player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
-        impact = (trade_value / market_cap_reference) * 0.10
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
+        impact = (trade_value / market_cap_reference) * 0.15  # Zwiększony wpływ transakcji graczy (gwałtowność)
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.25)
         
-    # ---- 2. ZAMKNIĘCIE POZYCJI DŁUGIEJ (SELL LONG) ----
+    # ---- SPRZEDAŻ LONG ----
     elif tx.type == "sell_long":
         positions = player["portfolio_long"].get(tx.symbol, [])
-        if sum(pos["amount"] for pos in positions) < tx.amount: 
-            return {"error": "Brak wymaganej liczby jednostek LONG!"}
+        if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek LONG!"}
         amt_to_rem = tx.amount
         refund = 0
         for pos in list(positions):
@@ -228,26 +240,24 @@ def process_transaction(tx: Transaction):
         player["balance"] += max(refund, 0.0)
         player["portfolio_long"][tx.symbol] = positions
         
-        impact = (trade_value / market_cap_reference) * 0.10
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+        impact = (trade_value / market_cap_reference) * 0.15
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.25)
 
-    # ---- 3. OTWARCIE POZYCJI KRÓTKIEJ (OPEN SHORT) ----
+    # ---- OTWARCIE SHORT ----
     elif tx.type == "open_short":
         margin = trade_value / tx.leverage
-        if player["balance"] < margin: 
-            return {"error": f"Brak środków! Wymagany depozyt: {margin:.2f} zł, a Twoje saldo to: {player['balance']:.2f} zł."}
+        if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
         player["balance"] -= margin
         player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
         player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
-        impact = (trade_value / market_cap_reference) * 0.10
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.10)
+        impact = (trade_value / market_cap_reference) * 0.15
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.25)
 
-    # ---- 4. ZAMKNIĘCIE POZYCJI KRÓTKIEJ (CLOSE SHORT) ----
+    # ---- ZAMKNIĘCIE SHORT ----
     elif tx.type == "close_short":
         positions = player["portfolio_short"].get(tx.symbol, [])
-        if sum(pos["amount"] for pos in positions) < tx.amount: 
-            return {"error": "Brak wymaganej liczby jednostek SHORT do zamknięcia!"}
+        if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek SHORT!"}
         amt_to_rem = tx.amount
         refund = 0
         for pos in list(positions):
@@ -268,8 +278,8 @@ def process_transaction(tx: Transaction):
         player["balance"] += max(refund, 0.0)
         player["portfolio_short"][tx.symbol] = positions
         
-        impact = (trade_value / market_cap_reference) * 0.10
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.10)
+        impact = (trade_value / market_cap_reference) * 0.15
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.25)
         
     save_json("players.json", players)
     save_json("gamestate.json", game_state)
@@ -308,8 +318,7 @@ def next_day():
     return {"error": "Maksymalny dzień osiągnięty"}
 
 @app.get("/api/messages")
-def get_messages(): 
-    return messages[-30:]
+def get_messages(): return messages[-30:]
 
 @app.post("/api/messages")
 def add_message(msg: Message):
@@ -318,67 +327,51 @@ def add_message(msg: Message):
     return {"status": "ok"}
 
 @app.get("/api/articles")
-def get_articles(): 
-    return articles
+def get_articles(): return articles
 
+# ---- SILNIK RYNKOWY (ZMODYFIKOWANY) ----
 def market_engine():
     tick_count = 15
     while True:
         time.sleep(4)
         tick_count += 1
+        
+        # Pobieranie trendów dla obecnego dnia (lub dnia 15, jeśli przekroczono limit)
         day = game_state["current_day"]
+        current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
         
         for p in prices:
             sym = p["symbol"]
             open_p = p["price"]
-            history_trend = 0.0
             
-            if day <= 4:
-                if sym == "USD": history_trend = 0.024
-                if sym in ["COP", "STAL", "AZOT"]: history_trend = -0.005
-                if sym == "PORT": history_trend = 0.006
-            elif day == 5:
-                if sym == "USD": history_trend = -0.06
-                if sym in ["PORT", "KOLEJ"]: history_trend = 0.018
-            elif day == 6:
-                if sym == "USD": history_trend = 0.03
-                if sym == "MIEDZ": history_trend = 0.014
-            elif day in [7, 8, 9]:
-                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.016
-                if sym == "AUTO": history_trend = 0.018
-                if sym == "AZOT": history_trend = 0.014
-                if sym in ["MIEDZ", "SREBRO"]: history_trend = 0.007
-            elif day in [10, 11, 12]:
-                if sym in ["SREBRO", "MIEDZ", "AUTO"]: history_trend = -0.035
-                if sym == "ZLOTO": history_trend = 0.022
-            elif day == 13:
-                if sym in ["PORT", "MAGI", "KOLEJ"]: history_trend = 0.026
-            elif day == 14:
-                if sym == "ZLOTO": history_trend = 0.035
-                if sym in ["MIEDZ", "AUTO"]: history_trend = 0.01
-            elif day == 15:
-                if sym in ["COP", "STAL"]: history_trend = 0.05
-                if sym in ["MIEDZ", "KOLEJ", "AUTO"]: history_trend = 0.018
-
-            market_noise = random.uniform(-0.003, 0.003)
+            # Odczyt specyficznego dla spółki przyspieszonego trendu (domyślnie 0.0 jeśli brak w spisie)
+            history_trend = current_day_trends.get(sym, 0.0)
+            
+            # Generowanie szumu rynkowego dostosowanego do nowej dynamiki
+            market_noise = random.uniform(-0.008, 0.008)
             player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
             
+            # Przeliczenie wpływu na pojedynczy tick (dzielnik 40 dopasowany do płynności)
             tick_history_change = history_trend / 40.0
             tick_player_change = player_impulse / 40.0
             
             total_tick_change = tick_history_change + tick_player_change + market_noise
             
-            if total_tick_change > 0.005: total_tick_change = 0.005
-            if total_tick_change < -0.005: total_tick_change = -0.005
+            # TWÓJ ZAPIS: twarde odcięcie wpływu całkowitego na maks 5% (0.05) w jeden tick
+            if total_tick_change > 0.05: total_tick_change = 0.05
+            if total_tick_change < -0.05: total_tick_change = -0.05
             
+            # Obliczenie ceny zamknięcia ticku
             close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
             p["price"] = close_p
             p["daily_change"] = round(((close_p - open_p)/open_p)*100, 2)
             
-            game_state["player_trend_impulse"][sym] *= 0.95
+            # Wygaszanie impulsu graczy
+            game_state["player_trend_impulse"][sym] *= 0.92
             
-            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.002), 2)
-            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.002), 0.01), 2)
+            # Świece wykresów
+            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.005), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.005), 0.01), 2)
             
             t_5m = f"12:{(tick_count*5)%60:02d}"
             t_1h = f"{(12+tick_count)%24:02d}:00"
@@ -396,14 +389,13 @@ def market_engine():
                     last[4] = close_p
                 if len(hist) > 15: candles_history[sym][tf] = hist[-15:]
 
-        # ---- MECHANIZM MARGIN CALL (LIKWIDACJA) ----
+        # ---- MECHANIZM MARGIN CALL (LIKWIDACJA AUTOMATYCZNA) ----
         for username, player in list(players.items()):
             if username == "admin": continue
             
             for sym, positions in list(player.get("portfolio_long", {}).items()):
                 current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
                 if current_price is None: continue
-                
                 for pos in list(positions):
                     loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
                     if loss >= pos["margin_allocated"]:
@@ -413,7 +405,6 @@ def market_engine():
             for sym, positions in list(player.get("portfolio_short", {}).items()):
                 current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
                 if current_price is None: continue
-                
                 for pos in list(positions):
                     loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
                     if loss >= pos["margin_allocated"]:
