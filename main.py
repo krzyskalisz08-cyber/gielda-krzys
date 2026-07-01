@@ -64,9 +64,7 @@ market_assets = {
     "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa oparta na parytecie złota."}
 }
 
-# ---- MAPA TRENDÓW DOBOWYCH (3X SILNIEJSZE, ZRÓŻNICOWANE) ----
-# Wartości reprezentują docelowy trend dobowy dla danego dnia. 
-# Żadne dwie spółki nie poruszają się w tym samym tempie.
+# ---- MAPA TRENDÓW DOBOWYCH ----
 MARKET_TRENDS = {
     1: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.009, "COP": -0.012, "STAL": -0.018, "AZOT": -0.015, "KOLEJ": -0.003, "AUTO": -0.006, "ZLOTO": 0.006, "MIEDZ": -0.009, "SREBRO": -0.006},
     2: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.012, "COP": -0.015, "STAL": -0.012, "AZOT": -0.018, "KOLEJ": -0.006, "AUTO": -0.003, "ZLOTO": 0.009, "MIEDZ": -0.006, "SREBRO": -0.009},
@@ -108,7 +106,7 @@ prices = load_json("prices.json", [])
 candles_history = load_json("candles.json", {})
 messages = load_json("messages.json", [])
 articles = load_json("articles.json", [
-    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Wdrożono nowy, dynamiczny i gwałtowny silnik giełdowy o ograniczeniu do 5% na tick."}
+    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Naprawiono naliczanie dziennych zmian procentowych."}
 ])
 game_state = load_json("gamestate.json", {"current_day": 1, "player_trend_impulse": {}})
 
@@ -125,7 +123,15 @@ def init_game():
         game_state["player_trend_impulse"] = {}
         
         for symbol, data in market_assets.items():
-            prices.append({"symbol": symbol, "name": data["name"], "price": data["base_price"], "desc": data["desc"], "daily_change": 0.0})
+            # DODANO: day_open_price do struktury ceny bazowej
+            prices.append({
+                "symbol": symbol, 
+                "name": data["name"], 
+                "price": data["base_price"], 
+                "day_open_price": data["base_price"], 
+                "desc": data["desc"], 
+                "daily_change": 0.0
+            })
             game_state["player_trend_impulse"][symbol] = 0.0
             bp = data["base_price"]
             
@@ -213,7 +219,7 @@ def process_transaction(tx: Transaction):
         player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
         player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
-        impact = (trade_value / market_cap_reference) * 0.15  # Zwiększony wpływ transakcji graczy (gwałtowność)
+        impact = (trade_value / market_cap_reference) * 0.15
         game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.25)
         
     # ---- SPRZEDAŻ LONG ----
@@ -309,10 +315,17 @@ def admin_add_article(art: Article):
     save_json("articles.json", articles)
     return {"status": "Artykuł opublikowany"}
 
+# ---- POPRAWIONY ENDPOINT ZMIANY DNIA ----
 @app.post("/api/admin/next-day")
 def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
+        
+        # Zapisujemy AKTUALNĄ cenę jako nową cenę otwarcia dnia odniesienia
+        for p in prices:
+            p["day_open_price"] = p["price"]
+            
+        save_json("prices.json", prices)
         save_json("gamestate.json", game_state)
         return {"status": f"Dzień {game_state['current_day']}"}
     return {"error": "Maksymalny dzień osiągnięty"}
@@ -329,47 +342,58 @@ def add_message(msg: Message):
 @app.get("/api/articles")
 def get_articles(): return articles
 
-# ---- SILNIK RYNKOWY (ZMODYFIKOWANY) ----
+# ---- KOPUTERYZACJA BACKUPU DLA GRACZY (Z POPRZEDNIEJ ROZMOWY) ----
+@app.get("/api/admin/export-players")
+def export_players(): return players
+
+@app.post("/api/admin/import-players")
+def import_players(raw_data: dict):
+    global players
+    players = raw_data
+    save_json("players.json", players)
+    return {"status": "Baza graczy przywrócona!"}
+
+# ---- SILNIK RYNKOWY (Z POPRAWIONYM PROCENTEM DOBOWYM) ----
 def market_engine():
     tick_count = 15
     while True:
         time.sleep(4)
         tick_count += 1
         
-        # Pobieranie trendów dla obecnego dnia (lub dnia 15, jeśli przekroczono limit)
         day = game_state["current_day"]
         current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
         
         for p in prices:
             sym = p["symbol"]
-            open_p = p["price"]
+            open_p = p["price"] # Cena z sekundy przed obliczeniem ticku
             
-            # Odczyt specyficznego dla spółki przyspieszonego trendu (domyślnie 0.0 jeśli brak w spisie)
             history_trend = current_day_trends.get(sym, 0.0)
-            
-            # Generowanie szumu rynkowego dostosowanego do nowej dynamiki
             market_noise = random.uniform(-0.008, 0.008)
             player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
             
-            # Przeliczenie wpływu na pojedynczy tick (dzielnik 40 dopasowany do płynności)
             tick_history_change = history_trend / 40.0
             tick_player_change = player_impulse / 40.0
             
             total_tick_change = tick_history_change + tick_player_change + market_noise
             
-            # TWÓJ ZAPIS: twarde odcięcie wpływu całkowitego na maks 5% (0.05) w jeden tick
+            # Twarde ograniczenie wpływu całkowitego na maks 5% w jeden tick
             if total_tick_change > 0.05: total_tick_change = 0.05
             if total_tick_change < -0.05: total_tick_change = -0.05
             
-            # Obliczenie ceny zamknięcia ticku
             close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
             p["price"] = close_p
-            p["daily_change"] = round(((close_p - open_p)/open_p)*100, 2)
             
-            # Wygaszanie impulsu graczy
+            # --- KLUCZOWA POPRAWKA ---
+            # Pobieramy cenę otwarcia TEGO DNIA. Jeśli z jakiegoś powodu jej nie ma, bierzemy cenę z ticku jako bezpieczny fallback.
+            day_open = p.get("day_open_price", open_p)
+            if day_open <= 0: day_open = 0.01 # ochrona przed dzieleniem przez zero
+            
+            # Procent odnosi się teraz do ceny Z POCZĄTKU DNIA, a nie z poprzedniej sekundy!
+            p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
+            # --------------------------
+            
             game_state["player_trend_impulse"][sym] *= 0.92
             
-            # Świece wykresów
             high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.005), 2)
             low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.005), 0.01), 2)
             
@@ -389,7 +413,7 @@ def market_engine():
                     last[4] = close_p
                 if len(hist) > 15: candles_history[sym][tf] = hist[-15:]
 
-        # ---- MECHANIZM MARGIN CALL (LIKWIDACJA AUTOMATYCZNA) ----
+        # ---- MECHANIZM MARGIN CALL ----
         for username, player in list(players.items()):
             if username == "admin": continue
             
@@ -411,7 +435,6 @@ def market_engine():
                         positions.remove(pos)
                         messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
 
-        # Zapis stanu giełdy i graczy po każdym ticku (co 4 sekundy)
         save_json("prices.json", prices)
         save_json("candles.json", candles_history)
         save_json("messages.json", messages)
