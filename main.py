@@ -7,6 +7,7 @@ import threading
 import time
 import os
 import json
+import datetime
 
 app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna")
 
@@ -64,7 +65,7 @@ market_assets = {
     "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa oparta na parytecie złota."}
 }
 
-# ---- MAPA TRENDÓW DOBOWYCH ----
+# ---- MAPA TRENDÓW DOBOWYCH (Rozkładane na 24h) ----
 MARKET_TRENDS = {
     1: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.009, "COP": -0.012, "STAL": -0.018, "AZOT": -0.015, "KOLEJ": -0.003, "AUTO": -0.006, "ZLOTO": 0.006, "MIEDZ": -0.009, "SREBRO": -0.006},
     2: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.012, "COP": -0.015, "STAL": -0.012, "AZOT": -0.018, "KOLEJ": -0.006, "AUTO": -0.003, "ZLOTO": 0.009, "MIEDZ": -0.006, "SREBRO": -0.009},
@@ -106,7 +107,7 @@ prices = load_json("prices.json", [])
 candles_history = load_json("candles.json", {})
 messages = load_json("messages.json", [])
 articles = load_json("articles.json", [
-    {"title": "Otwarcie Rynku II RP", "content": "Wiadomość Centrali: Terminale maklerskie zostały zsynchronizowane. Naprawiono naliczanie dziennych zmian procentowych."}
+    {"title": "Otwarcie Realnego Rynku 24H", "content": "System zsynchronizowany. Silnik bije co 1 sekundę, a dobowe zmiany procentowe odnoszą się do ceny otwarcia dnia."}
 ])
 game_state = load_json("gamestate.json", {"current_day": 1, "player_trend_impulse": {}})
 
@@ -123,7 +124,6 @@ def init_game():
         game_state["player_trend_impulse"] = {}
         
         for symbol, data in market_assets.items():
-            # DODANO: day_open_price do struktury ceny bazowej
             prices.append({
                 "symbol": symbol, 
                 "name": data["name"], 
@@ -136,9 +136,9 @@ def init_game():
             bp = data["base_price"]
             
             candles_history[symbol] = {
-                "5m": [["12:00", bp, bp+0.5, bp-0.5, bp]],
-                "1h": [["12:00", bp, bp+1, bp-1, bp]],
-                "1d": [["Dzień 1", bp, bp+2, bp-2, bp]]
+                "5m": [],
+                "1h": [],
+                "1d": []
             }
         save_json("prices.json", prices)
         save_json("candles.json", candles_history)
@@ -315,13 +315,12 @@ def admin_add_article(art: Article):
     save_json("articles.json", articles)
     return {"status": "Artykuł opublikowany"}
 
-# ---- POPRAWIONY ENDPOINT ZMIANY DNIA ----
 @app.post("/api/admin/next-day")
 def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
         
-        # Zapisujemy AKTUALNĄ cenę jako nową cenę otwarcia dnia odniesienia
+        # Przy zmianie dnia zapisujemy AKTUALNĄ cenę jako nową bazę otwarcia kolejnego dnia
         for p in prices:
             p["day_open_price"] = p["price"]
             
@@ -342,7 +341,6 @@ def add_message(msg: Message):
 @app.get("/api/articles")
 def get_articles(): return articles
 
-# ---- KOPUTERYZACJA BACKUPU DLA GRACZY (Z POPRZEDNIEJ ROZMOWY) ----
 @app.get("/api/admin/export-players")
 def export_players(): return players
 
@@ -353,57 +351,72 @@ def import_players(raw_data: dict):
     save_json("players.json", players)
     return {"status": "Baza graczy przywrócona!"}
 
-# ---- SILNIK RYNKOWY (Z POPRAWIONYM PROCENTEM DOBOWYM) ----
+# ---- SILNIK RYNKOWY (ODŚWIEŻANIE 1s, SKALA DOBOWA 24H) ----
 def market_engine():
-    tick_count = 15
+    tick_count = 0
+    
+    # 24 godziny w sekundach – na tyle rozbijamy scenariusz trendu historycznego
+    TICKS_PER_DAY = 86400.0 
+    
     while True:
-        time.sleep(4)
+        # Pętla wykonuje się dokładnie co 1 sekundę w czasie rzeczywistym
+        time.sleep(1)
         tick_count += 1
         
         day = game_state["current_day"]
         current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
         
+        # Pobranie prawdziwego czasu serwera do opisów osi czasu na frontendzie
+        now = datetime.datetime.now()
+        t_5m = now.strftime("%H:%M")
+        t_1h = now.strftime("%H:00")
+        t_1d = f"Dzień {day}"
+        
         for p in prices:
             sym = p["symbol"]
-            open_p = p["price"] # Cena z sekundy przed obliczeniem ticku
+            open_p = p["price"] 
             
             history_trend = current_day_trends.get(sym, 0.0)
-            market_noise = random.uniform(-0.008, 0.008)
+            
+            # Bezpieczny, mikro-szum sekundowy, aby cena żyła i drgała
+            market_noise = random.uniform(-0.00002, 0.00002)
+            
             player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
             
-            tick_history_change = history_trend / 40.0
-            tick_player_change = player_impulse / 40.0
+            # Dzielimy trend dobowy przez 86400 sekund
+            tick_history_change = history_trend / TICKS_PER_DAY
+            
+            # Impuls zakupowy gracza rozkładamy na ok. 10 minut (600 sekund), aby wzrost był płynny
+            tick_player_change = player_impulse / 600.0
             
             total_tick_change = tick_history_change + tick_player_change + market_noise
             
-            # Twarde ograniczenie wpływu całkowitego na maks 5% w jeden tick
-            if total_tick_change > 0.05: total_tick_change = 0.05
-            if total_tick_change < -0.05: total_tick_change = -0.05
+            # Zabezpieczenie przed nagłymi błędami (max 0.1% zmiany w 1 sekundę)
+            if total_tick_change > 0.001: total_tick_change = 0.001
+            if total_tick_change < -0.001: total_tick_change = -0.001
             
             close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
             p["price"] = close_p
             
-            # --- KLUCZOWA POPRAWKA ---
-            # Pobieramy cenę otwarcia TEGO DNIA. Jeśli z jakiegoś powodu jej nie ma, bierzemy cenę z ticku jako bezpieczny fallback.
+            # --- POPRAWKA PROCENTOWA ---
+            # Pobieramy cenę otwarcia z początku DNIA i liczymy realny, skumulowany zysk/stratę z 24h
             day_open = p.get("day_open_price", open_p)
-            if day_open <= 0: day_open = 0.01 # ochrona przed dzieleniem przez zero
-            
-            # Procent odnosi się teraz do ceny Z POCZĄTKU DNIA, a nie z poprzedniej sekundy!
+            if day_open <= 0: day_open = 0.01 
             p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
-            # --------------------------
             
-            game_state["player_trend_impulse"][sym] *= 0.92
+            # Powolne wygaszanie wpływu gracza sekunda po sekundzie
+            game_state["player_trend_impulse"][sym] *= 0.995
             
-            high_p = round(max(open_p, close_p) + random.uniform(0.01, close_p * 0.005), 2)
-            low_p = round(max(min(open_p, close_p) - random.uniform(0.01, close_p * 0.005), 0.01), 2)
-            
-            t_5m = f"12:{(tick_count*5)%60:02d}"
-            t_1h = f"{(12+tick_count)%24:02d}:00"
-            t_1d = f"Dzień {day}"
+            # Generowanie mikro-knotów dla świeczek
+            high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
+            low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
 
-            for tf, label in [("5m", t_5m), ("1h", t_1h), ("1d", t_1d)]:
+            # Budowanie świec na bazie sekund i prawdziwego czasu
+            for tf, label, interval in [("5m", t_5m, 300), ("1h", t_1h, 3600), ("1d", t_1d, 86400)]:
                 hist = candles_history[sym][tf]
-                if tick_count % 4 == 0 or len(hist) == 0:
+                
+                # Tworzymy nową świecę po upływie interwału (np. 300s dla wykresu 5-minutowego)
+                if tick_count % interval == 0 or len(hist) == 0:
                     hist.append([label, open_p, high_p, low_p, close_p])
                 else:
                     last = hist[-1]
@@ -411,7 +424,7 @@ def market_engine():
                     last[2] = max(last[2], high_p)
                     last[3] = min(last[3], low_p)
                     last[4] = close_p
-                if len(hist) > 15: candles_history[sym][tf] = hist[-15:]
+                if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
 
         # ---- MECHANIZM MARGIN CALL ----
         for username, player in list(players.items()):
@@ -435,10 +448,12 @@ def market_engine():
                         positions.remove(pos)
                         messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
 
-        save_json("prices.json", prices)
-        save_json("candles.json", candles_history)
-        save_json("messages.json", messages)
-        save_json("gamestate.json", game_state)
-        save_json("players.json", players)
+        # Optymalizacja zapisu (Zapis na dysk darmowego Rendera co 5 sekund, zamiast co sekundę)
+        if tick_count % 5 == 0:
+            save_json("prices.json", prices)
+            save_json("candles.json", candles_history)
+            save_json("messages.json", messages)
+            save_json("gamestate.json", game_state)
+            save_json("players.json", players)
 
 threading.Thread(target=market_engine, daemon=True).start()
