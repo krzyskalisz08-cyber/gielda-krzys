@@ -8,10 +8,11 @@ import time
 import os
 import json
 import datetime
+import psycopg2
+from psycopg2.extras import Json
 
 app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna")
 
-# Bezpieczne ustawienia CORS, żeby frontend mógł bez problemu pytać backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,11 +21,90 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- MODELE DANYCH (PYDANTIC) ----
+data_lock = threading.Lock()
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# ---- SYSTEM ZAPISU CLOUD/LOCAL ----
+def init_db():
+    if not DATABASE_URL:
+        print("[ℹ️ SYSTEM] Brak DATABASE_URL. Działam w trybie lokalnych plików JSON.")
+        return
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        # Tworzymy jedną tabelę pełniącą rolę bezpiecznego schowka klucz-wartość
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gielda_cloud_store (
+                key TEXT PRIMARY KEY,
+                value JSONB
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("[✅ DB SUCCESS] Połączono z bazą PostgreSQL na Neon.tech. Dane są bezpieczne!")
+    except Exception as e:
+        print(f"[❌ DB ERROR] Nie udało się zainicjalizować bazy danych: {e}")
+
+def save_data(key, data):
+    if not DATABASE_URL:
+        # Fallback lokalny
+        try:
+            temp_filename = f"{key}.json.tmp"
+            with open(temp_filename, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            os.replace(temp_filename, f"{key}.json")
+        except Exception as e:
+            print(f"⚠️ Błąd zapisu lokalnego {key}: {e}")
+        return
+
+    # Zapis do chmury PostgreSQL (Mechanizm UPSERT)
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO gielda_cloud_store (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key)
+            DO UPDATE SET value = EXCLUDED.value;
+        """, (key, Json(data)))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[❌ DB WRITE ERROR] Problem z zapisem klucza '{key}' do chmury: {e}")
+
+def load_data(key, default_value):
+    if not DATABASE_URL:
+        # Odczyt lokalny
+        filename = f"{key}.json"
+        if os.path.exists(filename):
+            try:
+                with open(filename, "r", encoding="utf-8") as f:
+                    return json.loads(f.read().strip())
+            except:
+                pass
+        return default_value
+
+    # Odczyt z chmury PostgreSQL
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM gielda_cloud_store WHERE key = %s;", (key,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            return row[0]
+    except Exception as e:
+        print(f"[❌ DB READ ERROR] Problem z odczytem klucza '{key}' z chmury: {e}")
+    return default_value
+
+# ---- MODELE DANYCH ----
 class Transaction(BaseModel):
     username: str
     symbol: str
-    type: str       # "buy_long", "sell_long", "open_short", "close_short"
+    type: str       
     amount: float
     leverage: int
 
@@ -66,7 +146,6 @@ market_assets = {
     "USD": {"name": "Dolar Amerykański", "base_price": 5.20, "desc": "Główna waluta rezerwowa oparta na parytecie złota."}
 }
 
-# ---- MAPA TRENDÓW DOBOWYCH (Rozkładane na 24h) ----
 MARKET_TRENDS = {
     1: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.009, "COP": -0.012, "STAL": -0.018, "AZOT": -0.015, "KOLEJ": -0.003, "AUTO": -0.006, "ZLOTO": 0.006, "MIEDZ": -0.009, "SREBRO": -0.006},
     2: {"USD": 0.072, "PORT": 0.018, "MAGI": 0.012, "COP": -0.015, "STAL": -0.012, "AZOT": -0.018, "KOLEJ": -0.006, "AUTO": -0.003, "ZLOTO": 0.009, "MIEDZ": -0.006, "SREBRO": -0.009},
@@ -85,39 +164,25 @@ MARKET_TRENDS = {
     15: {"COP": 0.160, "STAL": 0.140, "MIEDZ": 0.058, "KOLEJ": 0.050, "AUTO": 0.054, "PORT": 0.042, "MAGI": 0.036, "AZOT": 0.048, "ZLOTO": -0.060, "SREBRO": 0.030, "USD": -0.045}
 }
 
-# ---- FUNKCJE PERSYSTENCJI PLIKÓW ----
-def save_json(filename, data):
-    try:
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"⚠️ Błąd zapisu pliku {filename}: {e}")
+# Inicjalizacja bazy
+init_db()
 
-def load_json(filename, default_value):
-    if os.path.exists(filename):
-        try:
-            with open(filename, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"⚠️ Błąd odczytu pliku {filename}: {e}")
-    return default_value
-
-# ---- INICJALIZACJA STANU GRY ----
-players = load_json("players.json", {})
-prices = load_json("prices.json", [])
-candles_history = load_json("candles.json", {})
-messages = load_json("messages.json", [])
-articles = load_json("articles.json", [
-    {"title": "Otwarcie Realnego Rynku 24H", "content": "Silnik bije co 1 sekundę. Dobowe zmiany procentowe liczone są od ceny otwarcia dnia."}
+# Ładowanie stanu początkowego (z chmury lub lokalnie)
+players = load_data("players", {})
+prices = load_data("prices", [])
+candles_history = load_data("candles", {})
+messages = load_data("messages", [])
+articles = load_data("articles", [
+    {"title": "Otwarcie Rynku z Chmurą PostgreSQL", "content": "Gra została pomyślnie połączona z trwałą zewnętrzną bazą danych."}
 ])
-game_state = load_json("gamestate.json", {"current_day": 1, "player_trend_impulse": {}})
+game_state = load_data("gamestate", {"current_day": 1, "player_trend_impulse": {}})
 
 def init_game():
     global players, prices, candles_history, game_state
     if not players:
         players["admin"] = {"password": "druh", "balance": 9999999.0, "portfolio_long": {}, "portfolio_short": {}}
         players["krzys"] = {"password": "dh1", "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
-        save_json("players.json", players)
+        save_data("players", players)
         
     if not prices or not candles_history or "player_trend_impulse" not in game_state or not game_state["player_trend_impulse"]:
         prices = []
@@ -134,15 +199,11 @@ def init_game():
                 "daily_change": 0.0
             })
             game_state["player_trend_impulse"][symbol] = 0.0
+            candles_history[symbol] = {"5m": [], "1h": [], "1d": []}
             
-            candles_history[symbol] = {
-                "5m": [],
-                "1h": [],
-                "1d": []
-            }
-        save_json("prices.json", prices)
-        save_json("candles.json", candles_history)
-        save_json("gamestate.json", game_state)
+        save_data("prices", prices)
+        save_data("candles", candles_history)
+        save_data("gamestate", game_state)
 
 init_game()
 
@@ -152,315 +213,295 @@ def get_frontend():
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f: 
             return f.read()
-    return "<h1>Status: Backend Giełdy II RP działa pomyślnie</h1>"
+    return "<h1>Status: Pancerne API z PostgreSQL działa</h1>"
 
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
-    if cp.username in players: 
-        return {"error": "Ta nazwa jest zajęta!"}
-    players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
-    save_json("players.json", players)
-    return {"status": f"Pomyślnie utworzono profil: {cp.username}"}
+    with data_lock:
+        if cp.username in players: 
+            return {"error": "Ta nazwa jest zajęta!"}
+        players[cp.username] = {"password": cp.password, "balance": 5000.0, "portfolio_long": {}, "portfolio_short": {}}
+        save_data("players", players)
+        return {"status": f"Utworzono profil: {cp.username}"}
 
 @app.get("/api/prices")
 def get_prices(): 
-    return prices
+    with data_lock:
+        return prices
 
 @app.get("/api/candles/{symbol}/{timeframe}")
 def get_candles(symbol: str, timeframe: str):
-    if symbol in candles_history and timeframe in candles_history[symbol]: 
-        return candles_history[symbol][timeframe]
-    return []
+    with data_lock:
+        if symbol in candles_history and timeframe in candles_history[symbol]: 
+            return candles_history[symbol][timeframe]
+        return []
 
 @app.get("/api/player/{username}/{password}")
 def get_player_data(username: str, password: str):
-    if username not in players or players[username]["password"] != password: 
-        return {"error": "Błąd autoryzacji"}
-    return {
-        "balance": players[username]["balance"], 
-        "portfolio_long": players[username].get("portfolio_long", {}), 
-        "portfolio_short": players[username].get("portfolio_short", {}), 
-        "current_day": game_state["current_day"]
-    }
+    with data_lock:
+        if username not in players or players[username]["password"] != password: 
+            return {"error": "Błąd autoryzacji"}
+        return {
+            "balance": players[username]["balance"], 
+            "portfolio_long": players[username].get("portfolio_long", {}), 
+            "portfolio_short": players[username].get("portfolio_short", {}), 
+            "current_day": game_state["current_day"]
+        }
 
 @app.get("/api/admin/players-list")
 def admin_get_players():
-    return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
+    with data_lock:
+        return [{"username": u, "password": d["password"], "balance": d["balance"]} for u, d in players.items()]
 
 @app.post("/api/admin/delete-player")
 def admin_delete_player(dp: DeletePlayer):
-    if dp.username == "admin": return {"error": "Nie można usunąć administratora!"}
-    if dp.username in players:
-        del players[dp.username]
-        save_json("players.json", players)
-        return {"status": f"Usunięto gracza: {dp.username}"}
-    return {"error": "Nie znaleziono gracza."}
+    with data_lock:
+        if dp.username == "admin": return {"error": "Nie usuwaj admina!"}
+        if dp.username in players:
+            del players[dp.username]
+            save_data("players", players)
+            return {"status": f"Usunięto gracza: {dp.username}"}
+        return {"error": "Nie znaleziono gracza."}
 
 @app.post("/api/transactions")
 def process_transaction(tx: Transaction):
-    if tx.username not in players: return {"error": "Brak gracza"}
-    player = players[tx.username]
-    
-    if "portfolio_long" not in player: player["portfolio_long"] = {}
-    if "portfolio_short" not in player: player["portfolio_short"] = {}
+    with data_lock:
+        if tx.username not in players: return {"error": "Brak gracza"}
+        player = players[tx.username]
+        
+        if "portfolio_long" not in player: player["portfolio_long"] = {}
+        if "portfolio_short" not in player: player["portfolio_short"] = {}
 
-    idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
-    if idx is None: return {"error": "Brak aktywa"}
-    
-    asset_price = prices[idx]["price"]
-    market_cap_reference = 500000.0 
-    trade_value = tx.amount * asset_price
-    
-    # ---- KUPNO LONG ----
-    if tx.type == "buy_long":
-        margin = trade_value / tx.leverage
-        if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
-        player["balance"] -= margin
-        player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
-        player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+        idx = next((i for i, p in enumerate(prices) if p["symbol"] == tx.symbol), None)
+        if idx is None: return {"error": "Brak aktywa"}
         
-        impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
+        asset_price = prices[idx]["price"]
+        market_cap_reference = 500000.0 
+        trade_value = tx.amount * asset_price
         
-    # ---- SPRZEDAŻ LONG ----
-    elif tx.type == "sell_long":
-        positions = player["portfolio_long"].get(tx.symbol, [])
-        if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek LONG!"}
-        amt_to_rem = tx.amount
-        refund = 0
-        for pos in list(positions):
-            if amt_to_rem <= 0: break
-            if pos["amount"] <= amt_to_rem:
-                profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
-                refund += (pos["margin_allocated"] + profit)
-                amt_to_rem -= pos["amount"]
-                positions.remove(pos)
-            else:
-                fraction = amt_to_rem / pos["amount"]
-                allocated_part = pos["margin_allocated"] * fraction
-                profit = ((asset_price - pos["buy_price"]) * amt_to_rem) * pos["leverage"]
-                refund += (allocated_part + profit)
-                pos["margin_allocated"] -= allocated_part
-                pos["amount"] -= amt_to_rem
-                amt_to_rem = 0
-        player["balance"] += max(refund, 0.0)
-        player["portfolio_long"][tx.symbol] = positions
-        
-        impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
+        # ---- KUPNO LONG ----
+        if tx.type == "buy_long":
+            margin = trade_value / tx.leverage
+            if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
+            player["balance"] -= margin
+            player["portfolio_long"][tx.symbol] = player["portfolio_long"].get(tx.symbol, [])
+            player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+            impact = (trade_value / market_cap_reference) * 0.15
+            game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
+            
+        # ---- SPRZEDAŻ LONG ----
+        elif tx.type == "sell_long":
+            positions = player["portfolio_long"].get(tx.symbol, [])
+            if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek LONG!"}
+            amt_to_rem = tx.amount
+            refund = 0
+            for pos in list(positions):
+                if amt_to_rem <= 0: break
+                if pos["amount"] <= amt_to_rem:
+                    profit = ((asset_price - pos["buy_price"]) * pos["amount"]) * pos["leverage"]
+                    refund += (pos["margin_allocated"] + profit)
+                    amt_to_rem -= pos["amount"]
+                    positions.remove(pos)
+                else:
+                    fraction = amt_to_rem / pos["amount"]
+                    allocated_part = pos["margin_allocated"] * fraction
+                    profit = ((asset_price - pos["buy_price"]) * amt_to_rem) * pos["leverage"]
+                    refund += (allocated_part + profit)
+                    pos["margin_allocated"] -= allocated_part
+                    pos["amount"] -= amt_to_rem
+                    amt_to_rem = 0
+            player["balance"] += max(refund, 0.0)
+            player["portfolio_long"][tx.symbol] = positions
+            impact = (trade_value / market_cap_reference) * 0.15
+            game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
-    # ---- OTWARCIE SHORT ----
-    elif tx.type == "open_short":
-        margin = trade_value / tx.leverage
-        if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
-        player["balance"] -= margin
-        player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
-        player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
-        
-        impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
+        # ---- OTWARCIE SHORT ----
+        elif tx.type == "open_short":
+            margin = trade_value / tx.leverage
+            if player["balance"] < margin: return {"error": "Brak środków na depozyt!"}
+            player["balance"] -= margin
+            player["portfolio_short"][tx.symbol] = player["portfolio_short"].get(tx.symbol, [])
+            player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
+            impact = (trade_value / market_cap_reference) * 0.15
+            game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
-    # ---- ZAMKNIĘCIE SHORT ----
-    elif tx.type == "close_short":
-        positions = player["portfolio_short"].get(tx.symbol, [])
-        if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek SHORT!"}
-        amt_to_rem = tx.amount
-        refund = 0
-        for pos in list(positions):
-            if amt_to_rem <= 0: break
-            if pos["amount"] <= amt_to_rem:
-                profit = ((pos["entry_price"] - asset_price) * pos["amount"]) * pos["leverage"]
-                refund += (pos["margin_allocated"] + profit)
-                amt_to_rem -= pos["amount"]
-                positions.remove(pos)
-            else:
-                fraction = amt_to_rem / pos["amount"]
-                allocated_part = pos["margin_allocated"] * fraction
-                profit = ((pos["entry_price"] - asset_price) * amt_to_rem) * pos["leverage"]
-                refund += (allocated_part + profit)
-                pos["margin_allocated"] -= allocated_part
-                pos["amount"] -= amt_to_rem
-                amt_to_rem = 0
-        player["balance"] += max(refund, 0.0)
-        player["portfolio_short"][tx.symbol] = positions
-        
-        impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
-        
-    save_json("players.json", players)
-    save_json("gamestate.json", game_state)
-    return {"status": "ok"}
+        # ---- ZAMKNIĘCIE SHORT ----
+        elif tx.type == "close_short":
+            positions = player["portfolio_short"].get(tx.symbol, [])
+            if sum(pos["amount"] for pos in positions) < tx.amount: return {"error": "Brak jednostek SHORT!"}
+            amt_to_rem = tx.amount
+            refund = 0
+            for pos in list(positions):
+                if amt_to_rem <= 0: break
+                if pos["amount"] <= amt_to_rem:
+                    profit = ((pos["entry_price"] - asset_price) * pos["amount"]) * pos["leverage"]
+                    refund += (pos["margin_allocated"] + profit)
+                    amt_to_rem -= pos["amount"]
+                    positions.remove(pos)
+                else:
+                    fraction = amt_to_rem / pos["amount"]
+                    allocated_part = pos["margin_allocated"] * fraction
+                    profit = ((pos["entry_price"] - asset_price) * amt_to_rem) * pos["leverage"]
+                    refund += (allocated_part + profit)
+                    pos["margin_allocated"] -= allocated_part
+                    pos["amount"] -= amt_to_rem
+                    amt_to_rem = 0
+            player["balance"] += max(refund, 0.0)
+            player["portfolio_short"][tx.symbol] = positions
+            impact = (trade_value / market_cap_reference) * 0.15
+            game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
+            
+        save_data("players", players)
+        save_data("gamestate", game_state)
+        return {"status": "ok"}
 
 @app.post("/api/admin/money")
 def admin_add_money(data: AddMoney):
-    if data.username in players:
-        players[data.username]["balance"] += data.amount
-        save_json("players.json", players)
-        return {"status": f"Przyznano {data.amount} zł"}
-    return {"error": "Brak gracza"}
+    with data_lock:
+        if data.username in players:
+            players[data.username]["balance"] += data.amount
+            save_data("players", players)
+            return {"status": f"Przyznano {data.amount} zł"}
+        return {"error": "Brak gracza"}
 
 @app.post("/api/admin/change-percent")
 def admin_change_percent(data: SetPercentChange):
-    idx = next((i for i, p in enumerate(prices) if p["symbol"] == data.symbol), None)
-    if idx is not None:
-        multiplier = 1 + (data.percent / 100.0)
-        prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 4)
-        save_json("prices.json", prices)
-        return {"status": f"Zmieniono cenę {data.symbol} o {data.percent}%"}
-    return {"error": "Brak aktywa"}
-
-@app.post("/api/admin/article")
-def admin_add_article(art: Article):
-    articles.append({"title": art.title, "content": art.content})
-    save_json("articles.json", articles)
-    return {"status": "Artykuł opublikowany"}
+    with data_lock:
+        idx = next((i for i, p in enumerate(prices) if p["symbol"] == data.symbol), None)
+        if idx is not None:
+            multiplier = 1 + (data.percent / 100.0)
+            prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 4)
+            save_data("prices", prices)
+            return {"status": f"Zmieniono cenę {data.symbol}"}
+        return {"error": "Brak aktywa"}
 
 @app.post("/api/admin/next-day")
 def next_day():
-    if game_state["current_day"] < 15:
-        game_state["current_day"] += 1
-        
-        # Przy zmianie dnia przez admina AKTUALNA cena staje się punktem odniesienia
-        for p in prices:
-            p["day_open_price"] = p["price"]
-            
-        save_json("prices.json", prices)
-        save_json("gamestate.json", game_state)
-        return {"status": f"Dzień {game_state['current_day']}"}
-    return {"error": "Maksymalny dzień osiągnięty"}
+    with data_lock:
+        if game_state["current_day"] < 15:
+            game_state["current_day"] += 1
+            for p in prices:
+                p["day_open_price"] = p["price"]
+            save_data("prices", prices)
+            save_data("gamestate", game_state)
+            return {"status": f"Dzień {game_state['current_day']}"}
+        return {"error": "Maksymalny dzień osiągnięty"}
 
 @app.get("/api/messages")
-def get_messages(): return messages[-30:]
+def get_messages(): 
+    with data_lock:
+        return messages[-30:]
 
 @app.post("/api/messages")
 def add_message(msg: Message):
-    messages.append({"player": msg.player, "text": msg.text})
-    save_json("messages.json", messages)
-    return {"status": "ok"}
+    global messages
+    with data_lock:
+        messages.append({"player": msg.player, "text": msg.text})
+        if len(messages) > 100: messages = messages[-100:] 
+        save_data("messages", messages)
+        return {"status": "ok"}
 
 @app.get("/api/articles")
-def get_articles(): return articles
+def get_articles(): 
+    with data_lock:
+        return articles
 
-@app.get("/api/admin/export-players")
-def export_players(): return players
-
-@app.post("/api/admin/import-players")
-def import_players(raw_data: dict):
-    global players
-    players = raw_data
-    save_json("players.json", players)
-    return {"status": "Baza graczy przywrócona!"}
-
-# ---- SILNIK RYNKOWY (PRECYZJA 4 MIEJSC + SYSTEM RATUNKOWY) ----
+# ---- PANCERNY SILNIK RYNKOWY ----
 def market_engine():
     tick_count = 0
     TICKS_PER_DAY = 86400.0 
     
-    print("\n[DEBUG] 🚀 PRÓBA URUCHOMIENIA SILNIKA GIEŁDY...")
-    print(f"[DEBUG] W pamięci znajduje się obecnie {len(prices)} aktywów.")
+    print("\n[⚙️ OK] Silnik gotowy. Chmura aktywna, jeśli podano url.")
     
     while True:
         try:
-            # Silnik wykonuje operacje precyzyjnie co 1 sekundę
             time.sleep(1)
             tick_count += 1
             
-            day = game_state.get("current_day", 1)
-            current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
-            
-            # Pobranie prawdziwego czasu serwera do wykresów świecowych
-            now = datetime.datetime.now()
-            t_5m = now.strftime("%H:%M")
-            t_1h = now.strftime("%H:00")
-            t_1d = f"Dzień {day}"
-            
-            for p in prices:
-                sym = p["symbol"]
-                open_p = p["price"] 
+            with data_lock:
+                day = game_state.get("current_day", 1)
+                current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
                 
-                history_trend = current_day_trends.get(sym, 0.0)
+                now = datetime.datetime.now()
+                t_5m = now.strftime("%H:%M")
+                t_1h = now.strftime("%H:00")
+                t_1d = f"Dzień {day}"
                 
-                # Bezpieczny mikro-szum sekundowy, aby cena naturalnie żyła i drgała
-                market_noise = random.uniform(-0.00003, 0.00003)
-                player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
-                
-                # Rozkład trendów (historyczny na 24h, gracza na 10 minut)
-                tick_history_change = history_trend / TICKS_PER_DAY
-                tick_player_change = player_impulse / 600.0
-                
-                total_tick_change = tick_history_change + tick_player_change + market_noise
-                
-                # Twarda zapora bezpieczeństwa (max 0.2% ruchu w sekundy)
-                if total_tick_change > 0.002: total_tick_change = 0.002
-                if total_tick_change < -0.002: total_tick_change = -0.002
-                
-                # ZMIANA: Zapisujemy z precyzją 4 miejsc po przecinku, żeby zmiany się kumulowały
-                close_p = round(max(open_p * (1 + total_tick_change), 0.01), 4)
-                p["price"] = close_p
-                
-                # Zmiana procentowa wyliczana z różnicy ceny aktualnej i otwarcia dnia
-                day_open = p.get("day_open_price", open_p)
-                if day_open <= 0: day_open = 0.01 
-                p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
-                
-                # Wygaszanie wpływu działań graczy
-                if sym in game_state.get("player_trend_impulse", {}):
-                    game_state["player_trend_impulse"][sym] *= 0.995
-                
-                # Tworzenie knotów świecy
-                high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
-                low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
+                for p in prices:
+                    sym = p["symbol"]
+                    open_p = p["price"] 
+                    
+                    history_trend = current_day_trends.get(sym, 0.0)
+                    market_noise = random.uniform(-0.00003, 0.00003)
+                    player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
+                    
+                    tick_history_change = history_trend / TICKS_PER_DAY
+                    tick_player_change = player_impulse / 600.0
+                    
+                    total_tick_change = tick_history_change + tick_player_change + market_noise
+                    
+                    if total_tick_change > 0.002: total_tick_change = 0.002
+                    if total_tick_change < -0.002: total_tick_change = -0.002
+                    
+                    close_p = round(max(open_p * (1 + total_tick_change), 0.01), 4)
+                    p["price"] = close_p
+                    
+                    day_open = p.get("day_open_price", open_p)
+                    if day_open <= 0: day_open = 0.01 
+                    p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
+                    
+                    if sym in game_state.get("player_trend_impulse", {}):
+                        game_state["player_trend_impulse"][sym] *= 0.995
+                    
+                    high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
+                    low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
 
-                # Pakowanie do historii świec (zaokrąglone do 2 miejsc dla czytelności wykresów)
-                for tf, label, interval in [("5m", t_5m, 300), ("1h", t_1h, 3600), ("1d", t_1d, 86400)]:
-                    hist = candles_history[sym][tf]
-                    if tick_count % interval == 0 or len(hist) == 0:
-                        hist.append([label, round(open_p, 2), high_p, low_p, round(close_p, 2)])
-                    else:
-                        last = hist[-1]
-                        last[0] = label
-                        last[2] = max(last[2], high_p)
-                        last[3] = min(last[3], low_p)
-                        last[4] = round(close_p, 2)
-                    if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
+                    for tf, label, interval in [("5m", t_5m, 300), ("1h", t_1h, 3600), ("1d", t_1d, 86400)]:
+                        hist = candles_history[sym][tf]
+                        if tick_count % interval == 0 or len(hist) == 0:
+                            hist.append([label, round(open_p, 2), high_p, low_p, round(close_p, 2)])
+                        else:
+                            last = hist[-1]
+                            last[0] = label
+                            last[2] = max(last[2], high_p)
+                            last[3] = min(last[3], low_p)
+                            last[4] = round(close_p, 2)
+                        if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
 
-            # ---- AUTOMATYCZNY MECHANIZM MARGIN CALL ----
-            for username, player in list(players.items()):
-                if username == "admin": continue
-                
-                for sym, positions in list(player.get("portfolio_long", {}).items()):
-                    current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
-                    if current_price is None: continue
-                    for pos in list(positions):
-                        loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
-                        if loss >= pos["margin_allocated"]:
-                            positions.remove(pos)
-                            messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} została zlikwidowana."})
-                
-                for sym, positions in list(player.get("portfolio_short", {}).items()):
-                    current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
-                    if current_price is None: continue
-                    for pos in list(positions):
-                        loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
-                        if loss >= pos["margin_allocated"]:
-                            positions.remove(pos)
-                            messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana."})
+                # MARGIN CALLS
+                for username, player in list(players.items()):
+                    if username == "admin": continue
+                    
+                    for sym, positions in list(player.get("portfolio_long", {}).items()):
+                        current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                        if current_price is None: continue
+                        for pos in list(positions):
+                            loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
+                            if loss >= pos["margin_allocated"]:
+                                positions.remove(pos)
+                                messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} zlikwidowana."})
+                    
+                    for sym, positions in list(player.get("portfolio_short", {}).items()):
+                        current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                        if current_price is None: continue
+                        for pos in list(positions):
+                            loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
+                            if loss >= pos["margin_allocated"]:
+                                positions.remove(pos)
+                                messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} zlikwidowana."})
 
-            # KONTROLA TERMINALA: Wypluwa status co 3 sekundy, żebyś wiedział czy żyje
-            if tick_count % 3 == 0:
-                test_usd = next((p["price"] for p in prices if p["symbol"] == "USD"), "Brak")
-                print(f"[⚙️ SILNIK ŻYJE] Sekundy działania: {tick_count} | Aktualna cena USD: {test_usd}")
-
-            # Optymalizacja dysku: Zapis plików JSON co 5 sekund
-            if tick_count % 5 == 0:
-                save_json("prices.json", prices)
-                save_json("candles.json", candles_history)
-                save_json("messages.json", messages)
-                save_json("gamestate.json", game_state)
-                save_json("players.json", players)
-                
+                # Zapis i log co 5 sekund
+                if tick_count % 5 == 0:
+                    test_usd = next((p["price"] for p in prices if p["symbol"] == "USD"), 0.0)
+                    print(f"[⚙️ DB LIVE] Tick: {tick_count} | USD: {test_usd}")
+                    
+                    save_data("prices", prices)
+                    save_data("candles", candles_history)
+                    save_data("messages", messages)
+                    save_data("gamestate", game_state)
+                    save_data("players", players)
+                    
         except Exception as e:
-            print(f"⚠️ [CRITICAL BŁĄD SILNIKA]: {e}")
+            print(f"⚠️ [BLOKADA CRASH] Silnik przechwycił błąd i żyje dalej: {e}")
 
-# Automatyczne odpalenie niezależnego wątku giełdy przy starcie aplikacji
 threading.Thread(target=market_engine, daemon=True).start()
