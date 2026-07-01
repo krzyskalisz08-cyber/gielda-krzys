@@ -11,6 +11,7 @@ import datetime
 
 app = FastAPI(title="Giełda II RP - Realna Symulacja Chronologiczna")
 
+# Bezpieczne ustawienia CORS, żeby frontend mógł bez problemu pytać backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -84,13 +85,13 @@ MARKET_TRENDS = {
     15: {"COP": 0.160, "STAL": 0.140, "MIEDZ": 0.058, "KOLEJ": 0.050, "AUTO": 0.054, "PORT": 0.042, "MAGI": 0.036, "AZOT": 0.048, "ZLOTO": -0.060, "SREBRO": 0.030, "USD": -0.045}
 }
 
-# ---- POMOCNICZE FUNKCJE PERSYSTENCJI ----
+# ---- FUNKCJE PERSYSTENCJI PLIKÓW ----
 def save_json(filename, data):
     try:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
     except Exception as e:
-        print(f"Błąd zapisu pliku {filename}: {e}")
+        print(f"⚠️ Błąd zapisu pliku {filename}: {e}")
 
 def load_json(filename, default_value):
     if os.path.exists(filename):
@@ -98,7 +99,7 @@ def load_json(filename, default_value):
             with open(filename, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Błąd odczytu pliku {filename}: {e}")
+            print(f"⚠️ Błąd odczytu pliku {filename}: {e}")
     return default_value
 
 # ---- INICJALIZACJA STANU GRY ----
@@ -107,7 +108,7 @@ prices = load_json("prices.json", [])
 candles_history = load_json("candles.json", {})
 messages = load_json("messages.json", [])
 articles = load_json("articles.json", [
-    {"title": "Otwarcie Realnego Rynku 24H", "content": "System zsynchronizowany. Silnik bije co 1 sekundę, a dobowe zmiany procentowe odnoszą się do ceny otwarcia dnia."}
+    {"title": "Otwarcie Realnego Rynku 24H", "content": "Silnik bije co 1 sekundę. Dobowe zmiany procentowe liczone są od ceny otwarcia dnia."}
 ])
 game_state = load_json("gamestate.json", {"current_day": 1, "player_trend_impulse": {}})
 
@@ -133,7 +134,6 @@ def init_game():
                 "daily_change": 0.0
             })
             game_state["player_trend_impulse"][symbol] = 0.0
-            bp = data["base_price"]
             
             candles_history[symbol] = {
                 "5m": [],
@@ -220,7 +220,7 @@ def process_transaction(tx: Transaction):
         player["portfolio_long"][tx.symbol].append({"amount": tx.amount, "buy_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
         impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.25)
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
         
     # ---- SPRZEDAŻ LONG ----
     elif tx.type == "sell_long":
@@ -247,7 +247,7 @@ def process_transaction(tx: Transaction):
         player["portfolio_long"][tx.symbol] = positions
         
         impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.25)
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
     # ---- OTWARCIE SHORT ----
     elif tx.type == "open_short":
@@ -258,7 +258,7 @@ def process_transaction(tx: Transaction):
         player["portfolio_short"][tx.symbol].append({"amount": tx.amount, "entry_price": asset_price, "leverage": tx.leverage, "margin_allocated": margin})
         
         impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"][tx.symbol] - impact, -0.25)
+        game_state["player_trend_impulse"][tx.symbol] = max(game_state["player_trend_impulse"].get(tx.symbol, 0.0) - impact, -0.25)
 
     # ---- ZAMKNIĘCIE SHORT ----
     elif tx.type == "close_short":
@@ -285,7 +285,7 @@ def process_transaction(tx: Transaction):
         player["portfolio_short"][tx.symbol] = positions
         
         impact = (trade_value / market_cap_reference) * 0.15
-        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"][tx.symbol] + impact, 0.25)
+        game_state["player_trend_impulse"][tx.symbol] = min(game_state["player_trend_impulse"].get(tx.symbol, 0.0) + impact, 0.25)
         
     save_json("players.json", players)
     save_json("gamestate.json", game_state)
@@ -304,7 +304,7 @@ def admin_change_percent(data: SetPercentChange):
     idx = next((i for i, p in enumerate(prices) if p["symbol"] == data.symbol), None)
     if idx is not None:
         multiplier = 1 + (data.percent / 100.0)
-        prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 2)
+        prices[idx]["price"] = round(max(prices[idx]["price"] * multiplier, 0.01), 4)
         save_json("prices.json", prices)
         return {"status": f"Zmieniono cenę {data.symbol} o {data.percent}%"}
     return {"error": "Brak aktywa"}
@@ -320,7 +320,7 @@ def next_day():
     if game_state["current_day"] < 15:
         game_state["current_day"] += 1
         
-        # Przy zmianie dnia zapisujemy AKTUALNĄ cenę jako nową bazę otwarcia kolejnego dnia
+        # Przy zmianie dnia przez admina AKTUALNA cena staje się punktem odniesienia
         for p in prices:
             p["day_open_price"] = p["price"]
             
@@ -351,109 +351,116 @@ def import_players(raw_data: dict):
     save_json("players.json", players)
     return {"status": "Baza graczy przywrócona!"}
 
-# ---- SILNIK RYNKOWY (ODŚWIEŻANIE 1s, SKALA DOBOWA 24H) ----
+# ---- SILNIK RYNKOWY (PRECYZJA 4 MIEJSC + SYSTEM RATUNKOWY) ----
 def market_engine():
     tick_count = 0
-    
-    # 24 godziny w sekundach – na tyle rozbijamy scenariusz trendu historycznego
     TICKS_PER_DAY = 86400.0 
     
+    print("\n[DEBUG] 🚀 PRÓBA URUCHOMIENIA SILNIKA GIEŁDY...")
+    print(f"[DEBUG] W pamięci znajduje się obecnie {len(prices)} aktywów.")
+    
     while True:
-        # Pętla wykonuje się dokładnie co 1 sekundę w czasie rzeczywistym
-        time.sleep(1)
-        tick_count += 1
-        
-        day = game_state["current_day"]
-        current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
-        
-        # Pobranie prawdziwego czasu serwera do opisów osi czasu na frontendzie
-        now = datetime.datetime.now()
-        t_5m = now.strftime("%H:%M")
-        t_1h = now.strftime("%H:00")
-        t_1d = f"Dzień {day}"
-        
-        for p in prices:
-            sym = p["symbol"]
-            open_p = p["price"] 
+        try:
+            # Silnik wykonuje operacje precyzyjnie co 1 sekundę
+            time.sleep(1)
+            tick_count += 1
             
-            history_trend = current_day_trends.get(sym, 0.0)
+            day = game_state.get("current_day", 1)
+            current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
             
-            # Bezpieczny, mikro-szum sekundowy, aby cena żyła i drgała
-            market_noise = random.uniform(-0.00002, 0.00002)
+            # Pobranie prawdziwego czasu serwera do wykresów świecowych
+            now = datetime.datetime.now()
+            t_5m = now.strftime("%H:%M")
+            t_1h = now.strftime("%H:00")
+            t_1d = f"Dzień {day}"
             
-            player_impulse = game_state["player_trend_impulse"].get(sym, 0.0)
-            
-            # Dzielimy trend dobowy przez 86400 sekund
-            tick_history_change = history_trend / TICKS_PER_DAY
-            
-            # Impuls zakupowy gracza rozkładamy na ok. 10 minut (600 sekund), aby wzrost był płynny
-            tick_player_change = player_impulse / 600.0
-            
-            total_tick_change = tick_history_change + tick_player_change + market_noise
-            
-            # Zabezpieczenie przed nagłymi błędami (max 0.1% zmiany w 1 sekundę)
-            if total_tick_change > 0.001: total_tick_change = 0.001
-            if total_tick_change < -0.001: total_tick_change = -0.001
-            
-            close_p = round(max(open_p * (1 + total_tick_change), 0.02), 2)
-            p["price"] = close_p
-            
-            # --- POPRAWKA PROCENTOWA ---
-            # Pobieramy cenę otwarcia z początku DNIA i liczymy realny, skumulowany zysk/stratę z 24h
-            day_open = p.get("day_open_price", open_p)
-            if day_open <= 0: day_open = 0.01 
-            p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
-            
-            # Powolne wygaszanie wpływu gracza sekunda po sekundzie
-            game_state["player_trend_impulse"][sym] *= 0.995
-            
-            # Generowanie mikro-knotów dla świeczek
-            high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
-            low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
-
-            # Budowanie świec na bazie sekund i prawdziwego czasu
-            for tf, label, interval in [("5m", t_5m, 300), ("1h", t_1h, 3600), ("1d", t_1d, 86400)]:
-                hist = candles_history[sym][tf]
+            for p in prices:
+                sym = p["symbol"]
+                open_p = p["price"] 
                 
-                # Tworzymy nową świecę po upływie interwału (np. 300s dla wykresu 5-minutowego)
-                if tick_count % interval == 0 or len(hist) == 0:
-                    hist.append([label, open_p, high_p, low_p, close_p])
-                else:
-                    last = hist[-1]
-                    last[0] = label
-                    last[2] = max(last[2], high_p)
-                    last[3] = min(last[3], low_p)
-                    last[4] = close_p
-                if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
+                history_trend = current_day_trends.get(sym, 0.0)
+                
+                # Bezpieczny mikro-szum sekundowy, aby cena naturalnie żyła i drgała
+                market_noise = random.uniform(-0.00003, 0.00003)
+                player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
+                
+                # Rozkład trendów (historyczny na 24h, gracza na 10 minut)
+                tick_history_change = history_trend / TICKS_PER_DAY
+                tick_player_change = player_impulse / 600.0
+                
+                total_tick_change = tick_history_change + tick_player_change + market_noise
+                
+                # Twarda zapora bezpieczeństwa (max 0.2% ruchu w sekundy)
+                if total_tick_change > 0.002: total_tick_change = 0.002
+                if total_tick_change < -0.002: total_tick_change = -0.002
+                
+                # ZMIANA: Zapisujemy z precyzją 4 miejsc po przecinku, żeby zmiany się kumulowały
+                close_p = round(max(open_p * (1 + total_tick_change), 0.01), 4)
+                p["price"] = close_p
+                
+                # Zmiana procentowa wyliczana z różnicy ceny aktualnej i otwarcia dnia
+                day_open = p.get("day_open_price", open_p)
+                if day_open <= 0: day_open = 0.01 
+                p["daily_change"] = round(((close_p - day_open) / day_open) * 100, 2)
+                
+                # Wygaszanie wpływu działań graczy
+                if sym in game_state.get("player_trend_impulse", {}):
+                    game_state["player_trend_impulse"][sym] *= 0.995
+                
+                # Tworzenie knotów świecy
+                high_p = round(max(open_p, close_p) + random.uniform(0.0005, close_p * 0.0002), 2)
+                low_p = round(max(min(open_p, close_p) - random.uniform(0.0005, close_p * 0.0002), 0.01), 2)
 
-        # ---- MECHANIZM MARGIN CALL ----
-        for username, player in list(players.items()):
-            if username == "admin": continue
-            
-            for sym, positions in list(player.get("portfolio_long", {}).items()):
-                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
-                if current_price is None: continue
-                for pos in list(positions):
-                    loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
-                    if loss >= pos["margin_allocated"]:
-                        positions.remove(pos)
-                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
-            
-            for sym, positions in list(player.get("portfolio_short", {}).items()):
-                current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
-                if current_price is None: continue
-                for pos in list(positions):
-                    loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
-                    if loss >= pos["margin_allocated"]:
-                        positions.remove(pos)
-                        messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana z powodu braku depozytu."})
+                # Pakowanie do historii świec (zaokrąglone do 2 miejsc dla czytelności wykresów)
+                for tf, label, interval in [("5m", t_5m, 300), ("1h", t_1h, 3600), ("1d", t_1d, 86400)]:
+                    hist = candles_history[sym][tf]
+                    if tick_count % interval == 0 or len(hist) == 0:
+                        hist.append([label, round(open_p, 2), high_p, low_p, round(close_p, 2)])
+                    else:
+                        last = hist[-1]
+                        last[0] = label
+                        last[2] = max(last[2], high_p)
+                        last[3] = min(last[3], low_p)
+                        last[4] = round(close_p, 2)
+                    if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
 
-        # Optymalizacja zapisu (Zapis na dysk darmowego Rendera co 5 sekund, zamiast co sekundę)
-        if tick_count % 5 == 0:
-            save_json("prices.json", prices)
-            save_json("candles.json", candles_history)
-            save_json("messages.json", messages)
-            save_json("gamestate.json", game_state)
-            save_json("players.json", players)
+            # ---- AUTOMATYCZNY MECHANIZM MARGIN CALL ----
+            for username, player in list(players.items()):
+                if username == "admin": continue
+                
+                for sym, positions in list(player.get("portfolio_long", {}).items()):
+                    current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                    if current_price is None: continue
+                    for pos in list(positions):
+                        loss = (pos["buy_price"] - current_price) * pos["amount"] * pos["leverage"]
+                        if loss >= pos["margin_allocated"]:
+                            positions.remove(pos)
+                            messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja LONG na {sym} gracza {username} została zlikwidowana."})
+                
+                for sym, positions in list(player.get("portfolio_short", {}).items()):
+                    current_price = next((p["price"] for p in prices if p["symbol"] == sym), None)
+                    if current_price is None: continue
+                    for pos in list(positions):
+                        loss = (current_price - pos["entry_price"]) * pos["amount"] * pos["leverage"]
+                        if loss >= pos["margin_allocated"]:
+                            positions.remove(pos)
+                            messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} została zlikwidowana."})
 
+            # KONTROLA TERMINALA: Wypluwa status co 3 sekundy, żebyś wiedział czy żyje
+            if tick_count % 3 == 0:
+                test_usd = next((p["price"] for p in prices if p["symbol"] == "USD"), "Brak")
+                print(f"[⚙️ SILNIK ŻYJE] Sekundy działania: {tick_count} | Aktualna cena USD: {test_usd}")
+
+            # Optymalizacja dysku: Zapis plików JSON co 5 sekund
+            if tick_count % 5 == 0:
+                save_json("prices.json", prices)
+                save_json("candles.json", candles_history)
+                save_json("messages.json", messages)
+                save_json("gamestate.json", game_state)
+                save_json("players.json", players)
+                
+        except Exception as e:
+            print(f"⚠️ [CRITICAL BŁĄD SILNIKA]: {e}")
+
+# Automatyczne odpalenie niezależnego wątku giełdy przy starcie aplikacji
 threading.Thread(target=market_engine, daemon=True).start()
