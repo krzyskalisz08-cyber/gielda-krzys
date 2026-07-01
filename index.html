@@ -52,6 +52,12 @@
         .admin-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 5px; color: #fff; }
         .admin-table th { background: #2d2415; color: var(--gold); padding: 4px; border: 1px solid #473921; text-align: left; }
         .admin-table td { padding: 4px; border: 1px solid #473921; background: #13100a; }
+        
+        /* Styl dla tabeli rankingu */
+        .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        .rank-table th { color: var(--khaki); padding: 6px 4px; border-bottom: 1px solid #232d23; }
+        .rank-table td { padding: 8px 4px; border-bottom: 1px dashed #1f291f; }
+        .rank-row-top { color: var(--gold); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -89,7 +95,7 @@
                             <button onclick="setTimeframe('1d')">1D</button>
                         </div>
                     </div>
-                    
+                     
                     <div id="chart-container" onmousemove="handleChartHover(event)" onmouseleave="handleChartLeave()">
                         <div id="chart-line-v" class="chart-line-v"></div>
                         <div id="chart-line-h" class="chart-line-h"></div>
@@ -132,9 +138,23 @@
             </div>
 
             <div>
+                <div class="card" style="border: 1px solid #344934;">
+                    <h3 style="color: var(--gold); font-size: 15px;">🏆 Ranking Majątku Zastępów</h3>
+                    <div style="max-height: 160px; overflow-y: auto; margin-top: 5px;">
+                        <table class="rank-table">
+                            <thead>
+                                <tr><th>Miejsce</th><th>Zastęp</th><th style="text-align:right;">Wycena (Equity)</th></tr>
+                            </thead>
+                            <tbody id="leaderboard-body">
+                                <tr><td colspan="3" style="text-align:center; color:#666;">Ładowanie rankingu...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="card">
                     <h3>💼 Otwarte Pozycje LONG i SHORT</h3>
-                    <div id="portfolio-list" style="max-height: 200px; overflow-y: auto;"></div>
+                    <div id="portfolio-list" style="max-height: 150px; overflow-y: auto;"></div>
                 </div>
 
                 <div class="card" style="border: 1px solid var(--khaki); background: #161e16;">
@@ -159,7 +179,7 @@
                 <div id="admin-panel" class="card" style="display: none; border: 1px solid var(--gold); background: #1a160e;">
                     <h3 style="color: var(--gold);">⚔️ Panel Druha Prowadzącego</h3>
                     <button onclick="adminNextDay()" style="background:#5e481b; color:#fff; border:1px solid var(--gold);">Przewiń symulację o 1 Dzień</button>
-                    
+                     
                     <div style="border-top: 1px solid #3a301c; margin-top: 6px; padding-top: 4px;">
                         <label style="font-size:11px; color:var(--gold); font-weight:bold;">👥 Zarządzanie Patrolami:</label>
                         <table class="admin-table">
@@ -234,8 +254,10 @@
         }
 
         function initApp() {
-            updateGameData(); loadChat();
-            setInterval(updateGameData, 3000); setInterval(loadChat, 4000);
+            updateGameData(); loadChat(); updateLeaderboard();
+            setInterval(updateGameData, 3000); 
+            setInterval(loadChat, 4000);
+            setInterval(updateLeaderboard, 5000); // Odświeżanie rankingu co 5 sekund
         }
 
         async function updateGameData() {
@@ -259,6 +281,39 @@
 
             if(selectedAsset) renderChart();
             if(currentUser === "admin") loadAdminPlayersList();
+        }
+
+        // FUNKCJA AKTUALIZUJĄCA RANKING ZASTĘPÓW
+        async function updateLeaderboard() {
+            if(!currentUser) return;
+            try {
+                const res = await fetch(`${API_URL}/api/leaderboard`);
+                const leaderboard = await res.json();
+                const tbody = document.getElementById("leaderboard-body");
+                if(!tbody) return;
+                
+                tbody.innerHTML = "";
+                if(leaderboard.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#666;">Brak uczestników</td></tr>`;
+                    return;
+                }
+
+                leaderboard.forEach((user, index) => {
+                    const position = index + 1;
+                    let rowClass = position <= 3 ? "rank-row-top" : "";
+                    let medal = position === 1 ? "🥇 " : (position === 2 ? "🥈 " : (position === 3 ? "🥉 " : ""));
+                    
+                    tbody.innerHTML += `
+                        <tr class="${rowClass}">
+                            <td>${medal}${position}</td>
+                            <td><b>${user.username}</b> ${user.username === currentUser ? '<span style="font-size:10px; color:#666;">(Ty)</span>' : ''}</td>
+                            <td style="text-align:right; font-weight:bold;">${user.total_equity.toFixed(2)} zł</td>
+                        </tr>
+                    `;
+                });
+            } catch(e) {
+                console.error("Błąd pobierania rankingu:", e);
+            }
         }
 
         async function loadAdminPlayersList() {
@@ -298,6 +353,22 @@
             const d = await res.json(); alert(d.status || d.error); document.getElementById("admPercentChange").value = ""; updateGameData();
         }
 
+        async function adminGiveCash() {
+            const target = document.getElementById("admTarget").value.trim();
+            const cash = parseFloat(document.getElementById("admCash").value);
+            if(!target || isNaN(cash)) return alert("Wypełnij dane zasilenia konta!");
+            const res = await fetch(`${API_URL}/api/admin/money`, {
+                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ username: target, amount: cash })
+            });
+            const d = await res.json(); alert(d.status || d.error);
+            document.getElementById("admTarget").value = ""; document.getElementById("admCash").value = ""; updateGameData();
+        }
+
+        async function adminNextDay() {
+            const res = await fetch(`${API_URL}/api/admin/next-day`, { method: "POST" });
+            const d = await res.json(); alert(d.status || d.error); updateGameData();
+        }
+
         function renderAssets() {
             const container = document.getElementById("assets-list"); container.innerHTML = "";
             localPrices.forEach(a => {
@@ -307,7 +378,7 @@
                 container.innerHTML += `
                     <div class="asset-row ${act}" onclick="selectAsset('${a.symbol}')">
                         <div><b>${a.symbol}</b><br><span style="font-size:10px; color:#889988;">${a.name}</span></div>
-                        <div class="${chgClass}">${a.price.toFixed(2)} zł<br><span style="font-size:10px; font-weight:normal;">${chg >= 0 ? '+' : ''}${chg}%</span></div>
+                        <div class="${chgClass}">${a.price.toFixed(4)} zł<br><span style="font-size:10px; font-weight:normal;">${chg >= 0 ? '+' : ''}${chg}%</span></div>
                     </div>`;
             });
         }
@@ -456,7 +527,7 @@
                 method: "POST", headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({ username: currentUser, symbol: selectedAsset, type: type, amount: amt, leverage: lev })
             });
-            const d = await res.json(); if(d.error) alert(d.error); else updateGameData();
+            const d = await res.json(); if(d.error) alert(d.error); else { updateGameData(); updateLeaderboard(); }
         }
 
         function renderNews(articles) {
@@ -486,39 +557,22 @@
             board.innerHTML = lastAnnouncement; box.scrollTop = box.scrollHeight;
         }
 
+        // NAPRAWIONA I KOMPLETNA FUNKCJA WYSYŁANIA CZATU
         async function sendChatMessage() {
-            const inputEl = document.getElementById("chatText");
-            const text = inputEl.value.trim();
+            const input = document.getElementById("chatText");
+            const text = input.value.trim();
             if(!text) return;
 
             const res = await fetch(`${API_URL}/api/messages`, {
                 method: "POST", headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({ player: currentUser, text: text })
             });
-            inputEl.value = "";
-            loadChat();
-        }
-
-        async function adminNextDay() {
-            if(!confirm("Czy na pewno chcesz przewinąć symulację o 1 dzień?")) return;
-            const res = await fetch(`${API_URL}/api/admin/next-day`, { method: "POST" });
-            const d = await res.json(); alert(d.status || d.error);
-            updateGameData();
-        }
-
-        async function adminGiveCash() {
-            const target = document.getElementById("admTarget").value.trim();
-            const cash = parseFloat(document.getElementById("admCash").value);
-            if(!target || isNaN(cash)) return alert("Uzupełnij nazwę patrolu i kwotę!");
-
-            const res = await fetch(`${API_URL}/api/admin/give-cash`, {
-                method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ username: target, amount: cash })
-            });
-            const d = await res.json(); alert(d.status || d.error);
-            document.getElementById("admTarget").value = "";
-            document.getElementById("admCash").value = "";
-            updateGameData();
+            
+            const d = await res.json();
+            if(!d.error) {
+                input.value = "";
+                loadChat();
+            }
         }
     </script>
 </body>

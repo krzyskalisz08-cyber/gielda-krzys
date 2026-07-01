@@ -27,12 +27,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # ---- SYSTEM ZAPISU CLOUD/LOCAL ----
 def init_db():
     if not DATABASE_URL:
-        print("[ℹ️ SYSTEM] Brak DATABASE_URL. Działam w trybie lokalnych plików JSON.")
+        print("[ℹ️ SYSTEM] Brak DATABASE_URL. Działam w trybie lokalnych plików JSON.", flush=True)
         return
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        # Tworzymy jedną tabelę pełniącą rolę bezpiecznego schowka klucz-wartość
         cur.execute("""
             CREATE TABLE IF NOT EXISTS gielda_cloud_store (
                 key TEXT PRIMARY KEY,
@@ -42,23 +41,21 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("[✅ DB SUCCESS] Połączono z bazą PostgreSQL na Neon.tech. Dane są bezpieczne!")
+        print("[✅ DB SUCCESS] Połączono z bazą PostgreSQL na Neon.tech. Dane są bezpieczne!", flush=True)
     except Exception as e:
-        print(f"[❌ DB ERROR] Nie udało się zainicjalizować bazy danych: {e}")
+        print(f"[❌ DB ERROR] Nie udało się zainicjalizować bazy danych: {e}", flush=True)
 
 def save_data(key, data):
     if not DATABASE_URL:
-        # Fallback lokalny
         try:
             temp_filename = f"{key}.json.tmp"
             with open(temp_filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
             os.replace(temp_filename, f"{key}.json")
         except Exception as e:
-            print(f"⚠️ Błąd zapisu lokalnego {key}: {e}")
+            print(f"⚠️ Błąd zapisu lokalnego {key}: {e}", flush=True)
         return
 
-    # Zapis do chmury PostgreSQL (Mechanizm UPSERT)
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
@@ -72,10 +69,9 @@ def save_data(key, data):
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"[❌ DB WRITE ERROR] Problem z zapisem klucza '{key}' do chmury: {e}")
+        print(f"[❌ DB WRITE ERROR] Problem z zapisem klucza '{key}' do chmury: {e}", flush=True)
 
 def save_data_batch(batch_dict):
-    """Zapisuje wiele kluczy jednocześnie przy użyciu tylko jednego połączenia z bazą (Ochrona przed limitami Neona)"""
     if not DATABASE_URL:
         for key, data in batch_dict.items():
             save_data(key, data)
@@ -94,11 +90,10 @@ def save_data_batch(batch_dict):
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"[❌ DB BATCH WRITE ERROR] Problem z zapisem pakietu danych do chmury: {e}")
+        print(f"[❌ DB BATCH WRITE ERROR] Problem z zapisem pakietu danych do chmury: {e}", flush=True)
 
 def load_data(key, default_value):
     if not DATABASE_URL:
-        # Odczyt lokalny
         filename = f"{key}.json"
         if os.path.exists(filename):
             try:
@@ -108,7 +103,6 @@ def load_data(key, default_value):
                 pass
         return default_value
 
-    # Odczyt z chmury PostgreSQL
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
@@ -118,12 +112,11 @@ def load_data(key, default_value):
         conn.close()
         if row:
             val = row[0]
-            # Zabezpieczenie na wypadek, gdyby baza zwróciła surowy string zamiast obiektu
             if isinstance(val, str):
                 return json.loads(val)
             return val
     except Exception as e:
-        print(f"[❌ DB READ ERROR] Problem z odczytem klucza '{key}' z chmury: {e}")
+        print(f"[❌ DB READ ERROR] Problem z odczytem klucza '{key}' z chmury: {e}", flush=True)
     return default_value
 
 # ---- MODELE DANYCH ----
@@ -190,10 +183,9 @@ MARKET_TRENDS = {
     15: {"COP": 0.160, "STAL": 0.140, "MIEDZ": 0.058, "KOLEJ": 0.050, "AUTO": 0.054, "PORT": 0.042, "MAGI": 0.036, "AZOT": 0.048, "ZLOTO": -0.060, "SREBRO": 0.030, "USD": -0.045}
 }
 
-# Inicjalizacja bazy
 init_db()
 
-# Ładowanie stanu początkowego (z chmury lub lokalnie)
+# Ładowanie stanu początkowego
 players = load_data("players", {})
 prices = load_data("prices", [])
 candles_history = load_data("candles", {})
@@ -239,7 +231,11 @@ def get_frontend():
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f: 
             return f.read()
-    return "<h1>Status: Pancerne API z PostgreSQL działa</h1>"
+    return "<h1>Status: Pancerne API z PostgreSQL i Rankingiem działa</h1>"
+
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
 
 @app.post("/api/register")
 def register_player(cp: CreatePlayer):
@@ -273,6 +269,45 @@ def get_player_data(username: str, password: str):
             "portfolio_short": players[username].get("portfolio_short", {}), 
             "current_day": game_state["current_day"]
         }
+
+# ---- NOWY ENDPOINT: RANKING ZASTĘPÓW ----
+@app.get("/api/leaderboard")
+def get_leaderboard():
+    with data_lock:
+        leaderboard = []
+        
+        # Tworzymy mapę ułatwiającą szybkie pobieranie aktualnych cen aktywów
+        price_map = {p["symbol"]: p["price"] for p in prices}
+        
+        for username, data in players.items():
+            if username == "admin": 
+                continue # Nie wrzucamy konta admina do rywalizacji zastępów
+                
+            equity = data.get("balance", 0.0)
+            
+            # Wycena pozycji LONG: depozyt + (aktualna_cena - cena_zakupu) * ilość * dźwignia
+            for symbol, positions in data.get("portfolio_long", {}).items():
+                current_p = price_map.get(symbol, 0.0)
+                for pos in positions:
+                    profit = (current_p - pos["buy_price"]) * pos["amount"] * pos["leverage"]
+                    equity += (pos["margin_allocated"] + profit)
+                    
+            # Wycena pozycji SHORT: depozyt + (cena_wejścia - aktualna_cena) * ilość * dźwignia
+            for symbol, positions in data.get("portfolio_short", {}).items():
+                current_p = price_map.get(symbol, 0.0)
+                for pos in positions:
+                    profit = (pos["entry_price"] - current_p) * pos["amount"] * pos["leverage"]
+                    equity += (pos["margin_allocated"] + profit)
+            
+            leaderboard.append({
+                "username": username,
+                "total_equity": round(max(equity, 0.0), 2),
+                "cash_balance": round(data.get("balance", 0.0), 2)
+            })
+            
+        # Sortowanie od zastępu z największym majątkiem
+        leaderboard.sort(key=lambda x: x["total_equity"], reverse=True)
+        return leaderboard
 
 @app.get("/api/admin/players-list")
 def admin_get_players():
@@ -432,12 +467,16 @@ def get_articles():
     with data_lock:
         return articles
 
-# ---- PANCERNY SILNIK RYNKOWY ----
+# ---- SYSTEM PŁYNNEGO SILNIKA RYNKOWEGO Z BOTAMI ----
 def market_engine():
     tick_count = 0
     TICKS_PER_DAY = 86400.0 
     
-    print("\n[⚙️ OK] Silnik gotowy. Chmura aktywna, jeśli podano url.")
+    all_symbols = list(market_assets.keys())
+    bot_active_assets = random.sample(all_symbols, 5)
+    last_logged_day = game_state.get("current_day", 1)
+    
+    print(f"\n[⚙️ OK] Silnik gotowy. Aktywne aktywa botów na dzień {last_logged_day}: {bot_active_assets}", flush=True)
     
     while True:
         try:
@@ -446,6 +485,12 @@ def market_engine():
             
             with data_lock:
                 day = game_state.get("current_day", 1)
+                
+                if day != last_logged_day:
+                    bot_active_assets = random.sample(all_symbols, 5)
+                    last_logged_day = day
+                    print(f"[🤖 BOTY] Nowy dzień {day}! Boty zmieniają pozycje na: {bot_active_assets}", flush=True)
+                
                 current_day_trends = MARKET_TRENDS.get(day, MARKET_TRENDS[15])
                 
                 now = datetime.datetime.now()
@@ -458,13 +503,18 @@ def market_engine():
                     open_p = p["price"] 
                     
                     history_trend = current_day_trends.get(sym, 0.0)
-                    market_noise = random.uniform(-0.00003, 0.00003)
-                    player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
-                    
                     tick_history_change = history_trend / TICKS_PER_DAY
+                    
+                    player_impulse = game_state.get("player_trend_impulse", {}).get(sym, 0.0)
                     tick_player_change = player_impulse / 600.0
                     
-                    total_tick_change = tick_history_change + tick_player_change + market_noise
+                    tick_bot_change = 0.0
+                    if sym in bot_active_assets:
+                        bot_direction = random.choice([-1, 1])
+                        tick_bot_change = bot_direction * (0.03 / TICKS_PER_DAY)
+                    
+                    market_noise = random.uniform(-0.00001, 0.00001)
+                    total_tick_change = tick_history_change + tick_player_change + tick_bot_change + market_noise
                     
                     if total_tick_change > 0.002: total_tick_change = 0.002
                     if total_tick_change < -0.002: total_tick_change = -0.002
@@ -494,7 +544,7 @@ def market_engine():
                             last[4] = round(close_p, 2)
                         if len(hist) > 20: candles_history[sym][tf] = hist[-20:]
 
-                # MARGIN CALLS
+                # ---- SYSTEM MARGIN CALLS ----
                 for username, player in list(players.items()):
                     if username == "admin": continue
                     
@@ -516,10 +566,10 @@ def market_engine():
                                 positions.remove(pos)
                                 messages.append({"player": "SYSTEM", "text": f"🚨 MARGIN CALL! Pozycja SHORT na {sym} gracza {username} zlikwidowana."})
 
-                # Zapis i log co 5 sekund za pomocą zoptymalizowanego zapisu zbiorczego (Batch)
+                # Zapis i log do konsoli co 5 sekund
                 if tick_count % 5 == 0:
                     test_usd = next((p["price"] for p in prices if p["symbol"] == "USD"), 0.0)
-                    print(f"[⚙️ DB LIVE] Tick: {tick_count} | USD: {test_usd}")
+                    print(f"[⚙️ DB LIVE] Tick: {tick_count} | USD: {test_usd} | Boty grają na: {bot_active_assets}", flush=True)
                     
                     save_data_batch({
                         "prices": prices,
@@ -530,6 +580,6 @@ def market_engine():
                     })
                     
         except Exception as e:
-            print(f"⚠️ [BLOKADA CRASH] Silnik przechwycił błąd i żyje dalej: {e}")
+            print(f"⚠️ [BLOKADA CRASH] Silnik przechwycił błąd i żyje dalej: {e}", flush=True)
 
 threading.Thread(target=market_engine, daemon=True).start()
