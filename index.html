@@ -487,23 +487,38 @@
         }
 
         async function sendChatMessage() {
-            const el = document.getElementById("chatText"); const text = el.value.trim(); if(!text) return;
-            await fetch(`${API_URL}/api/messages`, {
-                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ player: currentUser, text: text })
-            }); el.value = ""; loadChat();
-        }
+            const inputEl = document.getElementById("chatText");
+            const text = inputEl.value.trim();
+            if(!text) return;
 
-        async function adminGiveCash() {
-            const t = document.getElementById("admTarget").value.trim(); const c = parseFloat(document.getElementById("admCash").value);
-            const res = await fetch(`${API_URL}/api/admin/money`, {
-                method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ username: t, amount: c })
+            const res = await fetch(`${API_URL}/api/messages`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ player: currentUser, text: text })
             });
-            const d = await res.json(); alert(d.status || d.error); updateGameData();
+            inputEl.value = "";
+            loadChat();
         }
 
         async function adminNextDay() {
-            const res = await fetch(`${API_URL}/api/admin/next-day`, {method: "POST"});
-            const d = await res.json(); alert(d.status || d.error); updateGameData();
+            if(!confirm("Czy na pewno chcesz przewinąć symulację o 1 dzień?")) return;
+            const res = await fetch(`${API_URL}/api/admin/next-day`, { method: "POST" });
+            const d = await res.json(); alert(d.status || d.error);
+            updateGameData();
+        }
+
+        async function adminGiveCash() {
+            const target = document.getElementById("admTarget").value.trim();
+            const cash = parseFloat(document.getElementById("admCash").value);
+            if(!target || isNaN(cash)) return alert("Uzupełnij nazwę patrolu i kwotę!");
+
+            const res = await fetch(`${API_URL}/api/admin/give-cash`, {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ username: target, amount: cash })
+            });
+            const d = await res.json(); alert(d.status || d.error);
+            document.getElementById("admTarget").value = "";
+            document.getElementById("admCash").value = "";
+            updateGameData();
         }
     </script>
 </body>
